@@ -47,6 +47,7 @@ void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
@@ -56,8 +57,11 @@ void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(RS485_DE_RE_GPIO_Port, RS485_DE_RE_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin Output Level */
+  /* PD1/EN 在 TIM17 启动前保持低电平，避免加热输出产生上电毛刺。 */
   HAL_GPIO_WritePin(BOARD_EN_GPIO_Port, BOARD_EN_Pin, GPIO_PIN_RESET);
+
+  /* LED1/LED3 均为低电平点亮，上电默认输出高电平保持熄灭。 */
+  HAL_GPIO_WritePin(GPIOA, LED1_Pin|LED3_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin : PA5 */
   GPIO_InitStruct.Pin = ADS124S08_CS_Pin;
@@ -73,12 +77,25 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(RS485_DE_RE_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PD1 */
+  /* PD1 先配置为普通低电平输出，启动 0% PWM 后再切换到 TIM17_CH1。 */
   GPIO_InitStruct.Pin = BOARD_EN_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(BOARD_EN_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PA12 PA15 */
+  GPIO_InitStruct.Pin = LED1_Pin|LED3_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /* PB3 外部已有 R19 上拉，按键按下时经 SW2 接地。 */
+  GPIO_InitStruct.Pin = BUTTON_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(BUTTON_GPIO_Port, &GPIO_InitStruct);
 
 }
 

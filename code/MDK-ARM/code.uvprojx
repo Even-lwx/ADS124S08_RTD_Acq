@@ -332,7 +332,7 @@
               <MiscControls />
               <Define>USE_HAL_DRIVER,STM32G031xx</Define>
               <Undefine />
-              <IncludePath>../Core/Inc;../code/ads124s08;../code/pt1000;../code/app;../Drivers/STM32G0xx_HAL_Driver/Inc;../Drivers/STM32G0xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32G0xx/Include;../Drivers/CMSIS/Include</IncludePath>
+              <IncludePath>../Core/Inc;../code/ads124s08;../code/pt1000;../code/pid;../code/app;../code/board_io;../Drivers/STM32G0xx_HAL_Driver/Inc;../Drivers/STM32G0xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32G0xx/Include;../Drivers/CMSIS/Include</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -402,6 +402,11 @@
               <FilePath>../Core/Src/spi.c</FilePath>
             </File>
             <File>
+              <FileName>tim.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/tim.c</FilePath>
+            </File>
+            <File>
               <FileName>usart.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Core/Src/usart.c</FilePath>
@@ -435,6 +440,21 @@
               <FileName>pt1000_app.c</FileName>
               <FileType>1</FileType>
               <FilePath>../code/app/pt1000_app.c</FilePath>
+            </File>
+            <File>
+              <FileName>pid.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../code/pid/pid.c</FilePath>
+            </File>
+            <File>
+              <FileName>temperature_control.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../code/app/temperature_control.c</FilePath>
+            </File>
+            <File>
+              <FileName>board_io.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../code/board_io/board_io.c</FilePath>
             </File>
           </Files>
         </Group>

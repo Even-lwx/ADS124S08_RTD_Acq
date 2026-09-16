@@ -1,3 +1,7 @@
+/**
+ * @file pt1000_app.c
+ * @brief 四路 PT1000 顺序采样、有效性检查和 USART2 数据输出实现。
+ */
 #include "pt1000_app.h"
 
 #include <string.h>
@@ -18,6 +22,7 @@ typedef struct
 
 static const PT1000_Channel channels[PT1000_APP_CHANNEL_COUNT] =
 {
+  /* 原理图固定映射：差分输入 AIN0/1、2/3、4/5、6/7；IDAC1 依次到 11～8。 */
   {0U, 1U, 11U},
   {2U, 3U, 10U},
   {4U, 5U,  9U},
@@ -26,6 +31,7 @@ static const PT1000_Channel channels[PT1000_APP_CHANNEL_COUNT] =
 
 static char *PT1000_AppendUnsigned(char *destination, uint32_t value)
 {
+  /* 避免引入 printf 浮点库，减小 Cortex-M0+ 固件体积。 */
   char reverse[10];
   uint8_t count = 0U;
 
@@ -160,6 +166,7 @@ void PT1000_AppTask(PT1000_App *app)
 
   if (app->adc_ready == 0U)
   {
+    /* 通信故障后每轮尝试重新初始化，输出结构仍保持固定。 */
     app->adc_ready = (ADS124S08_Init(&app->adc) == ADS124S08_OK) ? 1U : 0U;
   }
 
@@ -199,6 +206,7 @@ void PT1000_AppTask(PT1000_App *app)
     }
   }
 
+  /* 固定组帧：raw1,temp1,...,raw4,temp4\r；异常温度写为 nan。 */
   for (channel = 0U; channel < PT1000_APP_CHANNEL_COUNT; channel++)
   {
     cursor = PT1000_AppendSigned(cursor, raw[channel]);
@@ -209,10 +217,27 @@ void PT1000_AppTask(PT1000_App *app)
     {
       *cursor++ = ',';
     }
+
+    app->snapshot.raw[channel] = raw[channel];
+    app->snapshot.temperature_c[channel] = temperature[channel];
+    app->snapshot.valid[channel] = valid[channel];
   }
   *cursor++ = '\r';
+
+  app->snapshot.tick_ms = now;
+  app->snapshot.sequence++;
 
   (void)HAL_UART_Transmit(app->output_uart, (uint8_t *)frame,
                           (uint16_t)(cursor - frame),
                           PT1000_APP_UART_TIMEOUT_MS);
+}
+
+void PT1000_AppGetSnapshot(const PT1000_App *app,
+                           PT1000_AppSnapshot *snapshot)
+{
+  if ((app == NULL) || (snapshot == NULL))
+  {
+    return;
+  }
+  *snapshot = app->snapshot;
 }

@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "spi.h"
+#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 
@@ -26,6 +27,8 @@
 /* USER CODE BEGIN Includes */
 
 #include "pt1000_app.h"
+#include "temperature_control.h"
+#include "board_io.h"
 
 /* USER CODE END Includes */
 
@@ -50,6 +53,8 @@
 
 static PT1000_App pt1000_app;
 static PT1000_AppConfig pt1000_config;
+static TemperatureControl temperature_control;
+static TemperatureControl_Config temperature_control_config;
 
 /* USER CODE END PV */
 
@@ -93,14 +98,32 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_SPI1_Init();
+  MX_TIM17_Init();
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+
+  BoardIO_Init();
 
   PT1000_AppGetDefaultConfig(&pt1000_config);
   PT1000_AppInit(&pt1000_app, &hspi1, &huart2,
                  ADS124S08_CS_GPIO_Port, ADS124S08_CS_Pin,
                  GPIOA, GPIO_PIN_6, &pt1000_config);
+
+  TemperatureControl_GetDefaultConfig(&temperature_control_config);
+  /* Set these values after tuning the real thermal system. */
+  temperature_control_config.setpoint_c = 25.0f;
+  temperature_control_config.pid.kp = 0.0f;
+  temperature_control_config.pid.ki = 0.0f;
+  temperature_control_config.pid.kd = 0.0f;
+  if (TemperatureControl_Init(&temperature_control, &htim17, TIM_CHANNEL_1,
+                              &pt1000_app,
+                              &temperature_control_config) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* 定时器先以 0% 启动，再把 PD1 切为复用功能，避免 EN 出现高电平毛刺。 */
+  MX_TIM17_PWM_GPIO_Init();
 
   /* USER CODE END 2 */
 
@@ -108,7 +131,9 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    BoardButton_Update();
     PT1000_AppTask(&pt1000_app);
+    TemperatureControl_Task(&temperature_control);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

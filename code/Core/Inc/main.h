@@ -66,6 +66,14 @@ void Error_Handler(void);
 #define RS485_DE_RE_GPIO_Port GPIOC
 #define BOARD_EN_Pin GPIO_PIN_1
 #define BOARD_EN_GPIO_Port GPIOD
+#define PWM_OUT_Pin BOARD_EN_Pin
+#define PWM_OUT_GPIO_Port BOARD_EN_GPIO_Port
+#define LED1_Pin GPIO_PIN_12
+#define LED1_GPIO_Port GPIOA
+#define LED3_Pin GPIO_PIN_15
+#define LED3_GPIO_Port GPIOA
+#define BUTTON_Pin GPIO_PIN_3
+#define BUTTON_GPIO_Port GPIOB
 
 /* USER CODE END Private defines */
 

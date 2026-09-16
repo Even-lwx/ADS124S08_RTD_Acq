@@ -1,3 +1,10 @@
+/**
+ * @file ads124s08.c
+ * @brief ADS124S08 的 SPI 命令、寄存器配置及单次转换实现。
+ *
+ * SPI 使用 Mode 1（CPOL=0、CPHA=1），CS 由 PA5 软件控制。板上未连接
+ * 独立 DRDY#，因此转换期间在 CS 拉低时读取 DOUT/DRDY 电平。
+ */
 #include "ads124s08.h"
 
 #define ADS124S08_CMD_RREG        0x20U
@@ -7,9 +14,9 @@
 #define ADS124S08_DEVICE_ID_VALUE 0x00U
 
 /*
- * Configuration selected for the board's four PT1000 ratiometric channels:
- * PGA enabled at gain 1; single-shot, low-latency, 20 SPS; REFP0/REFN0;
- * internal reference always enabled for the IDACs; one 250-uA IDAC.
+ * 四路 PT1000 比例测量公共配置：PGA=1，单次转换，低延迟滤波 20 SPS，
+ * 参考源为 REFP0/REFN0；内部参考常开供 IDAC 使用，IDAC 电流为 250 uA。
+ * 各宏值按 SBAS660C 寄存器位定义组合得到。
  */
 #define ADS124S08_PGA_VALUE       0x08U
 #define ADS124S08_DATARATE_VALUE  0x34U
@@ -158,7 +165,7 @@ ADS124S08_Status ADS124S08_Init(ADS124S08_HandleTypeDef *device)
     return status;
   }
 
-  /* 4096 internal 4.096-MHz clocks are 1 ms; use 2 ms for margin. */
+  /* 软件复位后至少等待 4096 个 4.096 MHz ADC 时钟；2 ms 留有裕量。 */
   HAL_Delay(2U);
 
   status = ADS124S08_ReadRegisters(device, ADS124S08_REG_ID, &device_id, 1U);
@@ -215,6 +222,7 @@ ADS124S08_Status ADS124S08_ConfigureChannel(ADS124S08_HandleTypeDef *device,
     return ADS124S08_ERROR_PARAM;
   }
 
+  /* 连续写 INPMUX～IDACMUX，减少通道切换期间的 SPI 事务数量。 */
   registers[0] = (uint8_t)((positive_input << 4) | negative_input);
   registers[1] = ADS124S08_PGA_VALUE;
   registers[2] = ADS124S08_DATARATE_VALUE;
@@ -316,9 +324,9 @@ ADS124S08_Status ADS124S08_ReadSingle(ADS124S08_HandleTypeDef *device,
   *code = (int32_t)raw;
 
   /*
-   * Force DOUT/DRDY high before CS is released, as recommended on page 71
-   * when DOUT/DRDY is polled instead of using the dedicated DRDY pin.
-   * All board channels have an odd negative input, so INPMUX bit 0 is 1.
+   * 根据数据手册第 71 页建议，在复用 DOUT/DRDY 轮询时，释放 CS 前通过
+   * RREG 产生 SCLK，使 DOUT/DRDY 恢复高电平。四路负输入均为奇数，
+   * 因而读回 INPMUX 后最后移出的最低位为 1。
    */
   status = ADS124S08_ReadRegisters(device, ADS124S08_REG_INPMUX, &inpmux, 1U);
   if (status != ADS124S08_OK)

@@ -1,0 +1,66 @@
+/**
+ * @file board_io.h
+ * @brief PCB 板载按键与指示灯驱动的公共接口。
+ *
+ * 原理图依据：PB3 通过 R20 接 SW2 节点，R19 将该节点上拉到 3V3，
+ * 因此按键按下为低电平；PA12/PA15 接 LED 阴极，两个 LED 均为低电平点亮。
+ */
+#ifndef BOARD_IO_H
+#define BOARD_IO_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include <stdint.h>
+
+/** 板载 LED 编号，与原理图器件位号一一对应。 */
+typedef enum
+{
+  BOARD_LED_1 = 0,
+  BOARD_LED_3,
+  BOARD_LED_COUNT
+} BoardLED;
+
+/**
+ * @brief 初始化板级 IO 软件状态，并将 LED1、LED3 关闭。
+ * @note 必须在 MX_GPIO_Init() 之后调用。
+ */
+void BoardIO_Init(void);
+
+/**
+ * @brief 设置指定 LED 的逻辑状态。
+ * @param led BOARD_LED_1 或 BOARD_LED_3。
+ * @param on 非 0 表示点亮，0 表示熄灭；驱动内部负责低有效转换。
+ */
+void BoardLED_Set(BoardLED led, uint8_t on);
+
+/** @brief 翻转指定 LED，非法编号将被忽略。 */
+void BoardLED_Toggle(BoardLED led);
+
+/**
+ * @brief 更新按键消抖状态。
+ * @note 此函数不阻塞，应在主循环中持续调用；消抖时间固定为 20 ms。
+ */
+void BoardButton_Update(void);
+
+/** @return 消抖后的按键状态：1 表示按下，0 表示释放。 */
+uint8_t BoardButton_IsPressed(void);
+
+/**
+ * @brief 读取并清除一次“按下”事件。
+ * @return 自上次读取以来发生过稳定按下时返回 1，否则返回 0。
+ */
+uint8_t BoardButton_GetPressedEvent(void);
+
+/**
+ * @brief 读取并清除一次“释放”事件。
+ * @return 自上次读取以来发生过稳定释放时返回 1，否则返回 0。
+ */
+uint8_t BoardButton_GetReleasedEvent(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif

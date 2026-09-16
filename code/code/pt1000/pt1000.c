@@ -1,3 +1,7 @@
+/**
+ * @file pt1000.c
+ * @brief ADS124S08 比例码值、电阻与 IEC 60751 温度换算实现。
+ */
 #include "pt1000.h"
 
 #include <math.h>
@@ -21,6 +25,7 @@ float PT1000_CodeToResistance(int32_t adc_code,
     return -1.0f;
   }
 
+  /* 比例测量中 IDAC 电流约去：RRTD = Code * RREF / (2^23 * PGA)。 */
   resistance = ((float)adc_code * reference_resistance_ohm) /
                (PT1000_ADC_SCALE * pga_gain);
   if (calibration != 0)
@@ -34,6 +39,7 @@ float PT1000_CodeToResistance(int32_t adc_code,
 static float PT1000_ResistanceAtTemperature(float nominal_resistance_ohm,
                                              float temperature_c)
 {
+  /* IEC 60751：0 ℃以上使用 A/B 项，0 ℃以下额外使用 C 项。 */
   if (temperature_c >= 0.0f)
   {
     return nominal_resistance_ohm *
@@ -71,6 +77,7 @@ uint8_t PT1000_ResistanceToTemperature(float resistance_ohm,
   ratio = resistance_ohm / nominal_resistance_ohm;
   if (resistance_ohm >= nominal_resistance_ohm)
   {
+    /* 正温区为二次方程，可直接取物理有效根。 */
     float discriminant = PT1000_CVD_A * PT1000_CVD_A -
                          4.0f * PT1000_CVD_B * (1.0f - ratio);
     if (discriminant < 0.0f)
@@ -83,6 +90,7 @@ uint8_t PT1000_ResistanceToTemperature(float resistance_ohm,
   else
   {
     uint8_t iteration;
+    /* 负温区含四次项，使用牛顿法迭代求解 CVD 反函数。 */
     temperature = (ratio - 1.0f) / PT1000_CVD_A;
     for (iteration = 0U; iteration < 8U; iteration++)
     {
