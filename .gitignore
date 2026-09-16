@@ -1,0 +1,41 @@
+# Keil / MDK-ARM build outputs
+/code/MDK-ARM/code/
+/code/MDK-ARM/*.log
+/code/MDK-ARM/*.lst
+/code/MDK-ARM/*.uvguix.*
+/code/MDK-ARM/*.bak
+/code/MDK-ARM/*.tmp
+
+# Common embedded build artifacts
+/code/**/*.o
+/code/**/*.obj
+/code/**/*.d
+/code/**/*.crf
+/code/**/*.axf
+/code/**/*.elf
+/code/**/*.hex
+/code/**/*.bin
+/code/**/*.map
+/code/**/*.lnp
+/code/**/*.dep
+/code/**/*.build_log.htm
+
+# Python/tool runtime artifacts and generated reports
+__pycache__/
+*.py[cod]
+/sch*.txt
+
+# PCB: keep release archives only; exclude source trees and Altium history backups
+/pcb/**
+!/pcb/**/
+!/pcb/**/*.zip
+!/pcb/**/*.7z
+!/pcb/**/*.rar
+/pcb/**/History/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*~
