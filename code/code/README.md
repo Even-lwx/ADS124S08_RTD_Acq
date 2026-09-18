@@ -100,6 +100,14 @@ temperature_control_config.pid.kd = 0.0f;
 加热，不会产生制冷方向。PD1/EN 的 0% 为持续低电平，100% 为持续高电平。反馈可选
 平均值、最大值、最小值或指定通道，见 `TemperatureControl_FeedbackMode`。
 
+### PWM 阶梯测试模式
+
+`Core/Src/main.c` 中的 `PWM_RUN_MODE` 是唯一的模式选择宏。当前值为
+`PWM_RUN_MODE_WORK`，固件使用四路温度反馈进行 PID 控制。需要验证硬件时，
+可将该宏改为 `PWM_RUN_MODE_TEST`；固件将绕过 PID，让 PD1/EN 按
+10 秒间隔循环输出 20%、40%、60%、80% 和 100% 高电平占空比。两种模式
+都不会改变 USART2 的正式八字段温度数据帧。
+
 ## 硬件限制
 
 最新版 `Sheet1.SchDoc` 中，ADS124S08 的 START/SYNC 通过 AGND 电源端口接地，

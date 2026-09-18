@@ -2,13 +2,11 @@
 /**
   ******************************************************************************
   * @file    tim.c
-  * @brief   TIM17 CH1 generates a 1-kHz PWM on PD1/EN (AF1).
+  * @brief   TIM17 CH1 generates a 1-kHz PWM on PD1/EN (AF2).
   ******************************************************************************
   */
 /* USER CODE END Header */
 #include "tim.h"
-
-#define TIM17_CH1_PD1_AF 1U
 
 TIM_HandleTypeDef htim17;
 
@@ -17,12 +15,12 @@ void MX_TIM17_PWM_GPIO_Init(void)
   GPIO_InitTypeDef gpio_init = {0};
 
   __HAL_RCC_GPIOD_CLK_ENABLE();
-  /* STM32G031 数据手册 DS12992 第 41 页：PD1 的 AF1 为 TIM17_CH1。 */
+  /* STM32G031 数据手册 DS12992 第 41 页：PD1 的 AF2 为 TIM17_CH1。 */
   gpio_init.Pin = PWM_OUT_Pin;
   gpio_init.Mode = GPIO_MODE_AF_PP;
   gpio_init.Pull = GPIO_NOPULL;
   gpio_init.Speed = GPIO_SPEED_FREQ_HIGH;
-  gpio_init.Alternate = TIM17_CH1_PD1_AF;
+  gpio_init.Alternate = GPIO_AF2_TIM17;
   HAL_GPIO_Init(PWM_OUT_GPIO_Port, &gpio_init);
 }
 

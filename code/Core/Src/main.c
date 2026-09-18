@@ -28,6 +28,7 @@
 
 #include "pt1000_app.h"
 #include "temperature_control.h"
+#include "pwm_duty_test.h"
 #include "board_io.h"
 
 /* USER CODE END Includes */
@@ -35,10 +36,20 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 
+/** @brief PWM 输出运行模式。 */
+typedef enum
+{
+  PWM_RUN_MODE_WORK = 0, /**< 正常工作：由四路温度反馈和 PID 调整占空比。 */
+  PWM_RUN_MODE_TEST      /**< 测试模式：循环输出五档固定占空比。 */
+} PWM_RunMode;
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+/** 只需修改此宏即可在正常 PID 工作模式和 PWM 阶梯测试模式之间切换。 */
+#define PWM_RUN_MODE PWM_RUN_MODE_WORK
 
 /* USER CODE END PD */
 
@@ -53,6 +64,7 @@
 
 static PT1000_App pt1000_app;
 static PT1000_AppConfig pt1000_config;
+static PWM_DutyTest pwm_duty_test;
 static TemperatureControl temperature_control;
 static TemperatureControl_Config temperature_control_config;
 
@@ -111,23 +123,32 @@ int main(void)
                  ADS124S08_CS_GPIO_Port, ADS124S08_CS_Pin,
                  GPIOA, GPIO_PIN_6, &pt1000_config);
 
-  TemperatureControl_GetDefaultConfig(&temperature_control_config);
-  /* 以下设定值和 PID 参数需在实际热系统上完成整定后再修改。 */
-  temperature_control_config.setpoint_c = 25.0f;
-  temperature_control_config.pid.kp = 0.0f;
-  temperature_control_config.pid.ki = 0.0f;
-  temperature_control_config.pid.kd = 0.0f;
-  if (TemperatureControl_Init(&temperature_control, &htim17, TIM_CHANNEL_1,
-                              &pt1000_app,
-                              &temperature_control_config) != HAL_OK)
+  if (PWM_RUN_MODE == PWM_RUN_MODE_TEST)
   {
-    /*
-     * PWM/PID 初始化失败不能影响测温。强制占空比为 0，保持 PD1/EN
-     * 为安全的非加热状态。
-     */
-    __HAL_TIM_SET_COMPARE(&htim17, TIM_CHANNEL_1, 0U);
+    /* 测试模式绕过 PID，避免温度有效性检查把测试占空比重新置为 0%。 */
+    if (PWM_DutyTest_Init(&pwm_duty_test, &htim17,
+                          TIM_CHANNEL_1) != HAL_OK)
+    {
+      __HAL_TIM_SET_COMPARE(&htim17, TIM_CHANNEL_1, 0U);
+    }
   }
-  /* 定时器先以 0% 启动，再把 PD1 切为复用功能，避免 EN 出现高电平毛刺。 */
+  else
+  {
+    TemperatureControl_GetDefaultConfig(&temperature_control_config);
+    /* 以下设定值和 PID 参数需在实际热系统上完成整定后再修改。 */
+    temperature_control_config.setpoint_c = 25.0f;
+    temperature_control_config.pid.kp = 0.0f;
+    temperature_control_config.pid.ki = 0.0f;
+    temperature_control_config.pid.kd = 0.0f;
+    if (TemperatureControl_Init(&temperature_control, &htim17, TIM_CHANNEL_1,
+                                &pt1000_app,
+                                &temperature_control_config) != HAL_OK)
+    {
+      /* PWM/PID 初始化失败时保持 PD1/EN 为安全的非加热状态。 */
+      __HAL_TIM_SET_COMPARE(&htim17, TIM_CHANNEL_1, 0U);
+    }
+  }
+  /* 定时器输出启动后再把 PD1 切为复用功能，避免 EN 出现启动毛刺。 */
   MX_TIM17_PWM_GPIO_Init();
 
   /* USER CODE END 2 */
@@ -138,7 +159,14 @@ int main(void)
   {
     BoardButton_Update();
     PT1000_AppTask(&pt1000_app);
-    TemperatureControl_Task(&temperature_control);
+    if (PWM_RUN_MODE == PWM_RUN_MODE_TEST)
+    {
+      PWM_DutyTest_Task(&pwm_duty_test);
+    }
+    else
+    {
+      TemperatureControl_Task(&temperature_control);
+    }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

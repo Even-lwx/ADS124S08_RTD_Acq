@@ -459,6 +459,11 @@
               <FilePath>../code/app/temperature_control.c</FilePath>
             </File>
             <File>
+              <FileName>pwm_duty_test.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../code/app/pwm_duty_test.c</FilePath>
+            </File>
+            <File>
               <FileName>board_io.c</FileName>
               <FileType>1</FileType>
               <FilePath>../code/board_io/board_io.c</FilePath>
