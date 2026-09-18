@@ -6,11 +6,14 @@
 
 #include <math.h>
 
+/** IEC 60751 标准 Callendar-Van Dusen 系数。 */
 #define PT1000_CVD_A       3.9083e-3f
 #define PT1000_CVD_B      -5.775e-7f
 #define PT1000_CVD_C      -4.183e-12f
+/** CVD 方程标准有效温度范围。 */
 #define PT1000_MIN_TEMP_C -200.0f
 #define PT1000_MAX_TEMP_C  850.0f
+/** 24 位双极性 ADC 的正半量程 2^23。 */
 #define PT1000_ADC_SCALE   8388608.0f
 
 float PT1000_CodeToResistance(int32_t adc_code,
@@ -36,6 +39,13 @@ float PT1000_CodeToResistance(int32_t adc_code,
   return resistance;
 }
 
+/**
+ * @brief CVD 正向方程：根据温度计算理论电阻。
+ * @param nominal_resistance_ohm 0 ℃标称电阻 R0。
+ * @param temperature_c 温度，单位 ℃。
+ * @return 理论电阻，单位 Ω。
+ * @note 该内部函数同时用于范围检查和负温区牛顿迭代。
+ */
 static float PT1000_ResistanceAtTemperature(float nominal_resistance_ohm,
                                              float temperature_c)
 {
@@ -66,6 +76,7 @@ uint8_t PT1000_ResistanceToTemperature(float resistance_ohm,
     return 0U;
   }
 
+  /* 先把标准温度边界换算成电阻边界，拒绝无物理解的输入。 */
   if ((resistance_ohm < PT1000_ResistanceAtTemperature(
                             nominal_resistance_ohm, PT1000_MIN_TEMP_C)) ||
       (resistance_ohm > PT1000_ResistanceAtTemperature(
@@ -92,6 +103,7 @@ uint8_t PT1000_ResistanceToTemperature(float resistance_ohm,
     uint8_t iteration;
     /* 负温区含四次项，使用牛顿法迭代求解 CVD 反函数。 */
     temperature = (ratio - 1.0f) / PT1000_CVD_A;
+    /* 固定 8 次迭代可避免不确定执行时间，并满足当前浮点精度需求。 */
     for (iteration = 0U; iteration < 8U; iteration++)
     {
       float t2 = temperature * temperature;
@@ -104,6 +116,7 @@ uint8_t PT1000_ResistanceToTemperature(float resistance_ohm,
       {
         return 0U;
       }
+      /* Newton-Raphson：T(n+1)=T(n)-[R(T)-Rmeas]/R'(T)。 */
       temperature -= (calculated - resistance_ohm) / derivative;
     }
   }

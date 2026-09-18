@@ -6,6 +6,7 @@
 
 #include <stddef.h>
 
+/** @brief 将数值约束在闭区间 [minimum, maximum] 内。 */
 static float PID_Clamp(float value, float minimum, float maximum)
 {
   if (value < minimum)
@@ -25,6 +26,7 @@ void PID_Init(PID_Controller *controller, const PID_Config *config)
   {
     return;
   }
+  /* 配置按值复制，调用方后续修改原 config 不会影响当前实例。 */
   controller->config = *config;
   PID_Reset(controller);
 }
@@ -66,6 +68,7 @@ float PID_Update(PID_Controller *controller, float error, float dt_seconds)
                                    controller->config.integral_min,
                                    controller->config.integral_max);
 
+  /* 位置式 PID：u(k)=Kp*e(k)+积分项+Kd*(e(k)-e(k-1))/dt。 */
   output = controller->config.kp * error + controller->integral +
            controller->config.kd * derivative;
   output = PID_Clamp(output, controller->config.output_min,

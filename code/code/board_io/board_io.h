@@ -17,9 +17,9 @@ extern "C" {
 /** 板载 LED 编号，与原理图器件位号一一对应。 */
 typedef enum
 {
-  BOARD_LED_1 = 0,
-  BOARD_LED_3,
-  BOARD_LED_COUNT
+  BOARD_LED_1 = 0, /**< 原理图 LED1，对应 PA12。 */
+  BOARD_LED_3,     /**< 原理图 LED3，对应 PA15。 */
+  BOARD_LED_COUNT  /**< LED 数量及枚举边界，不作为有效 LED 传入接口。 */
 } BoardLED;
 
 /**
@@ -35,7 +35,10 @@ void BoardIO_Init(void);
  */
 void BoardLED_Set(BoardLED led, uint8_t on);
 
-/** @brief 翻转指定 LED，非法编号将被忽略。 */
+/**
+ * @brief 翻转指定 LED 的当前物理输出状态。
+ * @param led BOARD_LED_1 或 BOARD_LED_3；非法编号将被忽略。
+ */
 void BoardLED_Toggle(BoardLED led);
 
 /**
@@ -44,18 +47,23 @@ void BoardLED_Toggle(BoardLED led);
  */
 void BoardButton_Update(void);
 
-/** @return 消抖后的按键状态：1 表示按下，0 表示释放。 */
+/**
+ * @brief 获取当前稳定的按键逻辑状态，不会清除任何事件。
+ * @return 消抖后的按键状态：1 表示按下，0 表示释放。
+ */
 uint8_t BoardButton_IsPressed(void);
 
 /**
  * @brief 读取并清除一次“按下”事件。
  * @return 自上次读取以来发生过稳定按下时返回 1，否则返回 0。
+ * @note 若事件发生后一直未读取，标志保持为 1；不累计多次事件数量。
  */
 uint8_t BoardButton_GetPressedEvent(void);
 
 /**
  * @brief 读取并清除一次“释放”事件。
  * @return 自上次读取以来发生过稳定释放时返回 1，否则返回 0。
+ * @note 若事件发生后一直未读取，标志保持为 1；不累计多次事件数量。
  */
 uint8_t BoardButton_GetReleasedEvent(void);
 

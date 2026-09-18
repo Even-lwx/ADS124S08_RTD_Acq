@@ -9,6 +9,11 @@
 #include <stddef.h>
 #include <string.h>
 
+/**
+ * @brief 对占空比进行 0～100% 限幅并转换为定时器 CCR 计数值。
+ * @param control 温控实例，必须已绑定 PWM 定时器。
+ * @param duty_percent 期望的高电平占空比百分数。
+ */
 static void TemperatureControl_SetDuty(TemperatureControl *control,
                                        float duty_percent)
 {
@@ -31,6 +36,13 @@ static void TemperatureControl_SetDuty(TemperatureControl *control,
   control->duty_percent = duty_percent;
 }
 
+/**
+ * @brief 检查四路有效性，并按配置合成为一个 PID 反馈温度。
+ * @param control 温控实例，用于读取反馈选择策略。
+ * @param snapshot 最新四路温度快照。
+ * @param feedback_c 返回合成后的温度，单位 ℃。
+ * @return 四路均有效时返回 1；任一路无效时返回 0 且不允许继续加热。
+ */
 static uint8_t TemperatureControl_GetFeedback(
     const TemperatureControl *control,
     const PT1000_AppSnapshot *snapshot,
@@ -38,6 +50,7 @@ static uint8_t TemperatureControl_GetFeedback(
 {
   uint8_t channel;
 
+  /* 安全策略要求四个传感器全部在线，单通道模式也不放宽该条件。 */
   for (channel = 0U; channel < PT1000_APP_CHANNEL_COUNT; channel++)
   {
     if (snapshot->valid[channel] == 0U)
@@ -98,6 +111,7 @@ void TemperatureControl_GetDefaultConfig(TemperatureControl_Config *config)
   {
     return;
   }
+  /* 先清零，确保以后扩展字段时仍有确定的默认状态。 */
   memset(config, 0, sizeof(*config));
   config->setpoint_c = 25.0f;
   config->pid.kp = 0.0f;
@@ -120,6 +134,7 @@ HAL_StatusTypeDef TemperatureControl_Init(
 {
   HAL_StatusTypeDef status;
 
+  /* 输出和积分范围必须自洽，且仅允许本板连接的通道 1。 */
   if ((control == NULL) || (pwm_timer == NULL) ||
       (temperature_app == NULL) || (config == NULL) ||
       (pwm_channel != TIM_CHANNEL_1) ||
@@ -142,6 +157,7 @@ HAL_StatusTypeDef TemperatureControl_Init(
   /* PD1/EN 固定为高有效：逻辑 0% 持续低，PWM 有效脉冲为高电平。 */
   CLEAR_BIT(pwm_timer->Instance->CCER, TIM_CCER_CC1P);
 
+  /* 在使能定时器输出之前先写 CCR=0，保证启动瞬间不加热。 */
   TemperatureControl_SetDuty(control, 0.0f);
   status = HAL_TIM_PWM_Start(pwm_timer, pwm_channel);
   return status;
@@ -169,6 +185,7 @@ void TemperatureControl_Task(TemperatureControl *control)
     return;
   }
 
+  /* sequence 由采集任务每轮递增，用它确保一轮数据只计算一次 PID。 */
   PT1000_AppGetSnapshot(control->temperature_app, &snapshot);
   if ((snapshot.sequence == 0U) ||
       (snapshot.sequence == control->last_sequence))
@@ -177,6 +194,7 @@ void TemperatureControl_Task(TemperatureControl *control)
   }
   control->last_sequence = snapshot.sequence;
 
+  /* 禁用或传感器异常时立即归零输出，并清除可能积累的积分项。 */
   if ((control->config.enabled == 0U) ||
       (TemperatureControl_GetFeedback(control, &snapshot, &feedback_c) == 0U))
   {
@@ -185,6 +203,7 @@ void TemperatureControl_Task(TemperatureControl *control)
     return;
   }
 
+  /* 首次更新按标称 1 秒计算；之后采用真实采样间隔以降低周期抖动影响。 */
   if (control->last_update_tick == 0U)
   {
     dt_seconds = 1.0f;
@@ -192,6 +211,7 @@ void TemperatureControl_Task(TemperatureControl *control)
   else
   {
     dt_seconds = (float)(snapshot.tick_ms - control->last_update_tick) / 1000.0f;
+    /* 时间戳异常或停顿过久时重置 PID，避免积分和微分突然跳变。 */
     if ((dt_seconds <= 0.0f) || (dt_seconds > 10.0f))
     {
       dt_seconds = 1.0f;

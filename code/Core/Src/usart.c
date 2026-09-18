@@ -113,6 +113,16 @@ void MX_USART2_UART_Init(void)
   }
   /* USER CODE BEGIN USART2_Init 2 */
 
+  /*
+   * USART2/H1 初始化成功后立即发送启动标记。USART2 在 main() 中排在
+   * 其他通信和定时器外设之前，因此即使后续初始化失败也能看到该标记。
+   */
+  {
+    static const uint8_t boot_message[] = "BOOT\r\n";
+    (void)HAL_UART_Transmit(&huart2, (uint8_t *)boot_message,
+                            (uint16_t)(sizeof(boot_message) - 1U), 100U);
+  }
+
   /* USER CODE END USART2_Init 2 */
 
 }
