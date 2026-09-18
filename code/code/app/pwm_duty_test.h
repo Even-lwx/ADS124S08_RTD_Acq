@@ -33,7 +33,7 @@ HAL_StatusTypeDef PWM_DutyTest_Init(PWM_DutyTest *test,
                                     uint32_t channel);
 
 /**
- * @brief 按 10 秒间隔循环输出 20%、40%、60%、80% 和 100% 占空比。
+ * @brief 按 10 秒间隔循环输出 20%、40%、60%、80% 和 90% 占空比。
  * @param test 已成功初始化的测试实例。
  * @note 本函数不阻塞，需在主循环中持续调用。
  */

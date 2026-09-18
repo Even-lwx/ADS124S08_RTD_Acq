@@ -16,12 +16,12 @@
 #define ADS124S08_DEVICE_ID_VALUE 0x00U
 
 /*
- * 四路 PT1000 比例测量公共配置：PGA=1，单次转换，低延迟滤波 20 SPS，
+ * 四路 PT1000 比例测量公共配置：PGA=1，单次转换，低延迟滤波 50 SPS，
  * 参考源为 REFP0/REFN0；内部参考常开供 IDAC 使用，IDAC 电流为 250 uA。
  * 各宏值按 SBAS660C 寄存器位定义组合得到。
  */
 #define ADS124S08_PGA_VALUE       0x08U
-#define ADS124S08_DATARATE_VALUE  0x34U
+#define ADS124S08_DATARATE_VALUE  0x35U
 /* 外部 REFP0/REFN0 参考、内部参考常开，并开启 0.3 V 欠压监视。 */
 #define ADS124S08_REF_VALUE       0x52U
 #define ADS124S08_IDACMAG_VALUE   0x04U
@@ -29,10 +29,10 @@
 #define ADS124S08_IDAC_DISCONNECT 0x0FU
 
 /**
- * 20 SPS、低延迟滤波、单次模式首个结果典型为 56.504 ms。
- * 取 70 ms 覆盖内部时钟偏差和软件调度误差，防止读取上一次的旧数据。
+ * 50 SPS、低延迟滤波、单次模式首个结果典型为 26.504 ms。
+ * 取 35 ms 覆盖内部时钟偏差和软件调度误差，防止读取上一次的旧数据。
  */
-#define ADS124S08_FIRST_CONVERSION_WAIT_MS 70U
+#define ADS124S08_FIRST_CONVERSION_WAIT_MS 35U
 
 /**
  * 内部 2.5 V 参考在 REFOUT 外接 1 uF 电容时，数据手册给出的 0.001% 建立
@@ -362,8 +362,8 @@ ADS124S08_Status ADS124S08_ReadSingle(ADS124S08_HandleTypeDef *device,
 
   /*
    * DOUT/DRDY 在 START 前可能仍保留旧数据就绪状态。数据手册表 13 给出
-   * 当前 20 SPS 低延迟单次转换首个结果约需 56.504 ms，因此先等待
-   * 70 ms，再用剩余超时时间确认新数据已经就绪。
+   * 当前 50 SPS 低延迟单次转换首个结果约需 26.504 ms，因此先等待
+   * 35 ms，再用剩余超时时间确认新数据已经就绪。
    */
   if (timeout_ms <= ADS124S08_FIRST_CONVERSION_WAIT_MS)
   {

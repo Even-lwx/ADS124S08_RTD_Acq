@@ -138,7 +138,7 @@ ADS124S08_Status ADS124S08_ConfigureChannel(ADS124S08_HandleTypeDef *device,
  * @param code 用于返回符号扩展后的 24 位有符号 ADC 原始码。
  * @param timeout_ms START 后等待 DOUT/DRDY 变低的最大时间，单位 ms。
  * @return 转换状态；满量程码返回 ADS124S08_ERROR_SATURATED。
- * @note START 前先读 INPMUX 恢复 DOUT/DRDY；START 后至少等待 70 ms，
+ * @note START 前先读 INPMUX 恢复 DOUT/DRDY；START 后至少等待 35 ms，
  *       避免把上一次残留的低电平和旧数据误判为本次转换结果。
  */
 ADS124S08_Status ADS124S08_ReadSingle(ADS124S08_HandleTypeDef *device,

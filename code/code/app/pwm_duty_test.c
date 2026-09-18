@@ -3,7 +3,7 @@
  * @brief PD1/EN 高有效 PWM 阶梯占空比测试实现。
  *
  * TIM17 的周期为 1000 个计数，PWM1 模式且输出极性为高，因此 CCR 从
- * 200 递增到 1000 时，对应 20% 到 100% 的高电平占空比。
+ * 200 递增到 900 时，对应 20% 到 90% 的高电平占空比。
  */
 #include "pwm_duty_test.h"
 
@@ -12,26 +12,28 @@
 
 /** 每个占空比保持 10 秒，给万用表留出稳定显示时间。 */
 #define PWM_DUTY_TEST_STEP_PERIOD_MS 10000U
+/** 测试模式也遵守当前 90% 的 PWM 安全上限。 */
+#define PWM_DUTY_TEST_MAX_PERCENT 90U
 
-/** 测试顺序；到达 100% 后重新从 20% 开始循环。 */
-static const uint8_t duty_steps[] = {20U, 40U, 60U, 80U, 100U};
+/** 测试顺序；到达 90% 后重新从 20% 开始循环。 */
+static const uint8_t duty_steps[] = {20U, 40U, 60U, 80U, 90U};
 
 /**
  * @brief 把百分比换算为 CCR 计数值并更新高有效 PWM。
  * @param test 测试实例。
- * @param duty_percent 目标占空比，范围为 0～100。
+ * @param duty_percent 目标占空比，超过 90% 时会被限幅。
  */
 static void PWM_DutyTest_SetDuty(PWM_DutyTest *test, uint8_t duty_percent)
 {
   uint32_t period_counts;
   uint32_t compare;
 
-  if (duty_percent > 100U)
+  if (duty_percent > PWM_DUTY_TEST_MAX_PERCENT)
   {
-    duty_percent = 100U;
+    duty_percent = PWM_DUTY_TEST_MAX_PERCENT;
   }
 
-  /* ARR=999 时一个周期有 1000 个计数；CCR=1000 可得到持续高电平。 */
+  /* ARR=999 时一个周期有 1000 个计数；90% 对应 CCR=900。 */
   period_counts = __HAL_TIM_GET_AUTORELOAD(test->timer) + 1U;
   compare = ((uint32_t)duty_percent * period_counts + 50U) / 100U;
   __HAL_TIM_SET_COMPARE(test->timer, test->channel, compare);

@@ -1,6 +1,6 @@
 /**
  * @file pt1000_app.h
- * @brief 四路 PT1000 轮询采集、数据快照和串口组帧接口。
+ * @brief 四路 PT1000 轮询采集与数据快照接口。
  */
 #ifndef PT1000_APP_H
 #define PT1000_APP_H
@@ -38,7 +38,7 @@ typedef struct
 typedef struct
 {
   ADS124S08_HandleTypeDef adc; /**< 底层 ADS124S08 驱动实例。 */
-  UART_HandleTypeDef *output_uart; /**< 正式数据输出串口，本工程绑定 USART2。 */
+  UART_HandleTypeDef *output_uart; /**< FireWater 数据输出串口，本工程绑定 USART2。 */
   PT1000_AppConfig config; /**< 初始化时复制并长期使用的测温配置。 */
   PT1000_AppSnapshot snapshot; /**< 最近一次完成的四通道数据。 */
   uint32_t next_sample_tick; /**< 下一轮采样的绝对毫秒时刻。 */
@@ -55,7 +55,7 @@ void PT1000_AppGetDefaultConfig(PT1000_AppConfig *config);
  * @brief 初始化四路测温应用并绑定底层硬件。
  * @param app 应用实例。
  * @param spi ADS124S08 使用的 HAL SPI 句柄。
- * @param output_uart 固定数据帧输出使用的 HAL UART 句柄。
+ * @param output_uart 供温控模块输出 FireWater 数据的 HAL UART 句柄。
  * @param cs_port ADS124S08 CS# 端口。
  * @param cs_pin ADS124S08 CS# 引脚。
  * @param dout_port ADS124S08 DOUT/DRDY 端口。
@@ -71,9 +71,9 @@ void PT1000_AppInit(PT1000_App *app,
                     uint16_t dout_pin,
                     const PT1000_AppConfig *config);
 /**
- * @brief 执行一秒周期调度、四路采样、换算、快照发布和串口发送。
+ * @brief 执行 200 ms 周期调度、四路采样、换算和快照发布。
  * @param app 已初始化的应用实例。
- * @note 周期未到时立即返回；到期后的四次 ADC 转换和 UART 发送为阻塞操作。
+ * @note 周期未到时立即返回；到期后的四次 ADC 转换为阻塞操作。
  */
 void PT1000_AppTask(PT1000_App *app);
 /**

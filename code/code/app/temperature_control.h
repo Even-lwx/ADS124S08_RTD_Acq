@@ -31,7 +31,9 @@ typedef struct
   float setpoint_c; /**< 目标温度，单位 ℃。 */
   PID_Config pid;   /**< PID 系数、输出限幅和积分限幅。 */
   TemperatureControl_FeedbackMode feedback_mode; /**< 四路反馈合成策略。 */
+  float overtemperature_c; /**< 任一有效通道触发锁定停机的温度。 */
   uint8_t enabled;  /**< 非 0 允许加热，0 强制输出 0% 并清积分。 */
+  uint8_t telemetry_enabled; /**< 非 0 时从 USART2 输出每轮 FireWater 数据。 */
 } TemperatureControl_Config;
 
 /** @brief 温控实例，保存硬件绑定、PID 状态和最近一次控制结果。 */
@@ -45,13 +47,17 @@ typedef struct
   uint32_t last_sequence; /**< 已处理的采样轮次，防止重复计算。 */
   uint32_t last_update_tick; /**< 上次控制更新时间戳，用于计算 dt。 */
   float feedback_c; /**< 最近一次有效的合成反馈温度，单位 ℃。 */
-  float duty_percent; /**< 当前高电平有效占空比，范围 0～100%。 */
+  float error_c; /**< 最近一次设定温度与反馈温度之差，单位 ℃。 */
+  float dt_seconds; /**< 最近一次 PID 更新的实际时间间隔。 */
+  float duty_percent; /**< 当前高有效占空比，范围 0～pid.output_max。 */
+  uint8_t overtemperature_latched; /**< 1=已触发过温锁定，只能重新上电清除。 */
 } TemperatureControl;
 
 /**
  * @brief 载入安全的默认温控配置。
  * @param config 待填写的配置结构体。
  * @note 默认设定 25 ℃、四路平均反馈、使能控制；PID 系数为 0，需实机整定。
+ *       FireWater 整定数据默认关闭，由上层显式开启。
  */
 void TemperatureControl_GetDefaultConfig(TemperatureControl_Config *config);
 /**
@@ -72,7 +78,7 @@ HAL_StatusTypeDef TemperatureControl_Init(
 /**
  * @brief 在出现一轮新温度时更新反馈、PID 和 PWM 占空比。
  * @param control 已初始化的温控实例。
- * @note 无新快照时立即返回；任一路无效时执行安全停止。
+ * @note 无新快照时立即返回；有效传感器少于两路时执行安全停止。
  */
 void TemperatureControl_Task(TemperatureControl *control);
 /**

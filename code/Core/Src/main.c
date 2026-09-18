@@ -51,6 +51,26 @@ typedef enum
 /** 只需修改此宏即可在正常 PID 工作模式和 PWM 阶梯测试模式之间切换。 */
 #define PWM_RUN_MODE PWM_RUN_MODE_WORK
 
+/*
+ * 第二轮整定加入小积分项。Kp 的单位为“占空比百分点/℃”：
+ * 例如误差为 10 ℃、Kp=3 时，未限幅的 P 输出为 30%。
+ * Ki 的单位为“占空比百分点/(℃·s)”，用于缓慢消除纯 P 稳态误差。
+ */
+#define TEMPERATURE_SETPOINT_C 42.0f
+#define TEMPERATURE_PID_KP      3.0f
+#define TEMPERATURE_PID_KI      0.025f
+#define TEMPERATURE_PID_KD      0.0f
+/** 工作模式下允许输出的最大高有效 PWM 占空比。 */
+#define TEMPERATURE_PWM_MAX_DUTY_PERCENT 30.0f
+/** 积分项单独限幅，避免积分独自给出过大的持续加热功率。 */
+#define TEMPERATURE_PID_INTEGRAL_MAX_PERCENT 12.0f
+/** 12 V 实测维持功率约 7.4%，预置 6% 可减轻接近目标时的温度回落。 */
+#define TEMPERATURE_PID_INTEGRAL_INITIAL_PERCENT 5.5f
+/** 任一有效通道到达此温度时锁定关闭加热，直到重新上电。 */
+#define TEMPERATURE_OVERTEMPERATURE_C 48.0f
+/** 非 0 时每轮输出一行纯数字 FireWater 温控数据，当前采集频率为 5 Hz。 */
+#define TEMPERATURE_PID_TELEMETRY_ENABLE 1U
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -109,7 +129,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  /* USART2/H1 用于输出正式温度数据帧。 */
+  /* USART2/H1 用于输出纯数字 FireWater 温控数据。 */
   MX_USART2_UART_Init();
   MX_SPI1_Init();
   MX_TIM17_Init();
@@ -135,11 +155,23 @@ int main(void)
   else
   {
     TemperatureControl_GetDefaultConfig(&temperature_control_config);
-    /* 以下设定值和 PID 参数需在实际热系统上完成整定后再修改。 */
-    temperature_control_config.setpoint_c = 25.0f;
-    temperature_control_config.pid.kp = 0.0f;
-    temperature_control_config.pid.ki = 0.0f;
-    temperature_control_config.pid.kd = 0.0f;
+    /* 根据首轮纯 P 曲线加入小积分项，用于消除约 2.37 ℃ 稳态误差。 */
+    temperature_control_config.setpoint_c = TEMPERATURE_SETPOINT_C;
+    temperature_control_config.pid.kp = TEMPERATURE_PID_KP;
+    temperature_control_config.pid.ki = TEMPERATURE_PID_KI;
+    temperature_control_config.pid.kd = TEMPERATURE_PID_KD;
+    temperature_control_config.pid.output_max =
+        TEMPERATURE_PWM_MAX_DUTY_PERCENT;
+    temperature_control_config.pid.integral_max =
+        TEMPERATURE_PID_INTEGRAL_MAX_PERCENT;
+    temperature_control_config.pid.integral_initial =
+        TEMPERATURE_PID_INTEGRAL_INITIAL_PERCENT;
+    temperature_control_config.feedback_mode =
+        TEMPERATURE_FEEDBACK_MAXIMUM;
+    temperature_control_config.overtemperature_c =
+        TEMPERATURE_OVERTEMPERATURE_C;
+    temperature_control_config.telemetry_enabled =
+        TEMPERATURE_PID_TELEMETRY_ENABLE;
     if (TemperatureControl_Init(&temperature_control, &htim17, TIM_CHANNEL_1,
                                 &pt1000_app,
                                 &temperature_control_config) != HAL_OK)
