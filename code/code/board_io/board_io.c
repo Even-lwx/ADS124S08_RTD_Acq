@@ -10,6 +10,12 @@
 /** SW2 原始电平连续保持此时间后，才更新对外发布的稳定状态。 */
 #define BOARD_BUTTON_DEBOUNCE_MS 20U
 
+/** 加热时 LED1 的翻转间隔，完整亮灭周期为 200 ms。 */
+#define BOARD_HEATING_LED_FAST_INTERVAL_MS 100U
+
+/** 未加热时 LED1 的翻转间隔，完整亮灭周期为 1000 ms。 */
+#define BOARD_HEATING_LED_SLOW_INTERVAL_MS 500U
+
 /** 软件消抖状态；事件采用锁存方式，读取事件后才清零。 */
 typedef struct
 {
@@ -22,6 +28,17 @@ typedef struct
 
 /** 单按键驱动的全局软件状态，仅由本模块访问。 */
 static BoardButtonState button_state;
+
+/** LED1 加热状态指示的非阻塞节拍状态。 */
+typedef struct
+{
+  uint8_t heating;          /**< 上一次调用时的加热状态。 */
+  uint8_t led_on;           /**< LED1 当前逻辑状态：1 亮，0 灭。 */
+  uint32_t last_toggle_tick; /**< 上一次翻转 LED1 的毫秒时间戳。 */
+} BoardHeatingIndicatorState;
+
+/** LED1 加热状态指示实例，仅由本模块访问。 */
+static BoardHeatingIndicatorState heating_indicator_state;
 
 /**
  * @brief 读取 SW2 的瞬时物理电平并转换为逻辑状态。
@@ -81,6 +98,11 @@ void BoardIO_Init(void)
   button_state.pressed_event = 0U;
   button_state.released_event = 0U;
   button_state.candidate_tick = HAL_GetTick();
+
+  /* 上电从“未加热、LED 熄灭”开始，500 ms 后进入慢闪节拍。 */
+  heating_indicator_state.heating = 0U;
+  heating_indicator_state.led_on = 0U;
+  heating_indicator_state.last_toggle_tick = HAL_GetTick();
 }
 
 void BoardLED_Set(BoardLED led, uint8_t on)
@@ -107,6 +129,35 @@ void BoardLED_Toggle(BoardLED led)
   {
     /* 低有效只影响“设置”语义，直接翻转物理电平仍等价于亮灭翻转。 */
     HAL_GPIO_TogglePin(port, pin);
+  }
+}
+
+void BoardHeatingIndicator_Update(uint8_t heating)
+{
+  uint8_t current_heating = (heating != 0U) ? 1U : 0U;
+  uint32_t interval_ms;
+  uint32_t now = HAL_GetTick();
+
+  if (current_heating != heating_indicator_state.heating)
+  {
+    /* 状态改变时立即点亮一次，使快闪/慢闪模式的切换能够直接看见。 */
+    heating_indicator_state.heating = current_heating;
+    heating_indicator_state.led_on = 1U;
+    heating_indicator_state.last_toggle_tick = now;
+    BoardLED_Set(BOARD_LED_1, 1U);
+    return;
+  }
+
+  interval_ms = (current_heating != 0U) ?
+                BOARD_HEATING_LED_FAST_INTERVAL_MS :
+                BOARD_HEATING_LED_SLOW_INTERVAL_MS;
+
+  /* 无符号时间差允许 HAL 毫秒计数器回绕，不需要阻塞延时。 */
+  if ((now - heating_indicator_state.last_toggle_tick) >= interval_ms)
+  {
+    heating_indicator_state.last_toggle_tick = now;
+    heating_indicator_state.led_on ^= 1U;
+    BoardLED_Set(BOARD_LED_1, heating_indicator_state.led_on);
   }
 }
 

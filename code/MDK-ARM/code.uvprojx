@@ -404,6 +404,11 @@
               <FilePath>../Core/Src/gpio.c</FilePath>
             </File>
             <File>
+              <FileName>iwdg.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/iwdg.c</FilePath>
+            </File>
+            <File>
               <FileName>spi.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Core/Src/spi.c</FilePath>
@@ -512,6 +517,11 @@
               <FileName>stm32g0xx_hal_gpio.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Drivers/STM32G0xx_HAL_Driver/Src/stm32g0xx_hal_gpio.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32g0xx_hal_iwdg.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Drivers/STM32G0xx_HAL_Driver/Src/stm32g0xx_hal_iwdg.c</FilePath>
             </File>
             <File>
               <FileName>stm32g0xx_hal_dma.c</FileName>

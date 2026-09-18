@@ -42,6 +42,14 @@ void BoardLED_Set(BoardLED led, uint8_t on);
 void BoardLED_Toggle(BoardLED led);
 
 /**
+ * @brief 根据加热输出状态更新 LED1（PA12）的非阻塞闪烁节拍。
+ * @param heating 非 0 表示当前 PWM 正在加热，0 表示当前未加热。
+ * @note 加热时 LED1 每 100 ms 翻转一次；未加热时每 500 ms 翻转一次。
+ *       本函数内部使用 HAL_GetTick() 计时，应在主循环中持续调用。
+ */
+void BoardHeatingIndicator_Update(uint8_t heating);
+
+/**
  * @brief 更新按键消抖状态。
  * @note 此函数不阻塞，应在主循环中持续调用；消抖时间固定为 20 ms。
  */

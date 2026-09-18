@@ -22,6 +22,7 @@
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
+#include "iwdg.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -183,6 +184,9 @@ int main(void)
   /* 定时器输出启动后再把 PD1 切为复用功能，避免 EN 出现启动毛刺。 */
   MX_TIM17_PWM_GPIO_Init();
 
+  /* 所有应用和加热输出均进入确定状态后再启动约 4 秒独立看门狗。 */
+  MX_IWDG_Init();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -198,6 +202,16 @@ int main(void)
     else
     {
       TemperatureControl_Task(&temperature_control);
+    }
+
+    /* 直接读取 TIM17 实际比较值，兼容 PID 工作模式和 PWM 阶梯测试模式。 */
+    BoardHeatingIndicator_Update(
+        (__HAL_TIM_GET_COMPARE(&htim17, TIM_CHANNEL_1) != 0U) ? 1U : 0U);
+
+    /* 只有本轮按键、采集、温控和状态指示任务全部返回后才刷新看门狗。 */
+    if (HAL_IWDG_Refresh(&hiwdg) != HAL_OK)
+    {
+      Error_Handler();
     }
     /* USER CODE END WHILE */
 

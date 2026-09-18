@@ -48,6 +48,18 @@ if (BoardButton_GetPressedEvent())   /* 每次稳定按下只返回一次 */
 `BoardButton_IsPressed()` 返回当前消抖状态；`BoardButton_GetPressedEvent()` 和
 `BoardButton_GetReleasedEvent()` 分别读取并清除按下/释放事件。驱动已封装低有效极性。
 
+主循环还会调用 `BoardHeatingIndicator_Update()` 驱动 PA12/LED1：TIM17 实际
+占空比大于 0 时，每 100 ms 翻转一次（完整周期 200 ms）；占空比为 0 时，
+每 500 ms 翻转一次（完整周期 1 s）。闪烁使用 `HAL_GetTick()` 非阻塞计时，
+不会影响温度采集和 PID 更新。
+
+## 独立看门狗
+
+固件在全部外设、采集应用和 PWM 输出初始化完成后启动 IWDG。看门狗使用独立
+LSI 时钟、256 分频、重装值 499；按典型 32 kHz LSI 计算，超时时间约为 4 秒。
+主循环只有在按键、四路采集、温控和 LED 指示任务全部返回后才喂狗。如果程序
+卡死或任务长期不能返回，IWDG 将自动复位 MCU，并由上电安全逻辑先保持加热关闭。
+
 ## ADS124S08 配置
 
 | 寄存器 | 值 | 含义 |
