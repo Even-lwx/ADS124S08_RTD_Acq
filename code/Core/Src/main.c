@@ -97,26 +97,12 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  /*
-   * USART2/H1 是唯一调试口，必须优先初始化。这样后续 SPI、TIM17 或
-   * USART1 初始化失败时，Error_Handler() 仍能够从 H1 报告错误。
-   */
+  /* USART2/H1 用于输出正式温度数据帧。 */
   MX_USART2_UART_Init();
   MX_SPI1_Init();
   MX_TIM17_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-
-  /*
-   * 能运行到这里说明全部 CubeMX 外设初始化已经返回。BOOT 由
-   * MX_USART2_UART_Init() 自己发送，本标记用于定位后续应用初始化。
-   */
-  {
-    static const uint8_t peripheral_ready_message[] = "PERIPH_OK\r\n";
-    (void)HAL_UART_Transmit(&huart2, (uint8_t *)peripheral_ready_message,
-                            (uint16_t)(sizeof(peripheral_ready_message) - 1U),
-                            100U);
-  }
 
   BoardIO_Init();
 
@@ -126,7 +112,7 @@ int main(void)
                  GPIOA, GPIO_PIN_6, &pt1000_config);
 
   TemperatureControl_GetDefaultConfig(&temperature_control_config);
-  /* Set these values after tuning the real thermal system. */
+  /* 以下设定值和 PID 参数需在实际热系统上完成整定后再修改。 */
   temperature_control_config.setpoint_c = 25.0f;
   temperature_control_config.pid.kp = 0.0f;
   temperature_control_config.pid.ki = 0.0f;
@@ -136,13 +122,10 @@ int main(void)
                               &temperature_control_config) != HAL_OK)
   {
     /*
-     * PWM/PID 初始化失败不能影响测温和 USART2 诊断。强制占空比为 0，
-     * 保持 PD1/EN 为安全的非加热状态，同时给调试口发送一次故障标记。
+     * PWM/PID 初始化失败不能影响测温。强制占空比为 0，保持 PD1/EN
+     * 为安全的非加热状态。
      */
-    static const uint8_t pwm_error_message[] = "PWM_ERR\r\n";
     __HAL_TIM_SET_COMPARE(&htim17, TIM_CHANNEL_1, 0U);
-    (void)HAL_UART_Transmit(&huart2, (uint8_t *)pwm_error_message,
-                            (uint16_t)(sizeof(pwm_error_message) - 1U), 100U);
   }
   /* 定时器先以 0% 启动，再把 PD1 切为复用功能，避免 EN 出现高电平毛刺。 */
   MX_TIM17_PWM_GPIO_Init();
@@ -221,15 +204,12 @@ void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
   /*
-   * 若 USART2 已经完成基础初始化，则在停机前发送一次错误标记。
-   * 这里先发送再关中断，避免 HAL 超时计时依赖的 SysTick 被提前关闭。
-   * 早于 USART2 初始化发生的时钟错误无法通过串口报告，因此先检查实例。
+   * 发生不可恢复错误时关闭加热并停机。系统时钟等早期初始化也可能进入
+   * 本函数，因此只有 TIM17 已绑定实例后才能访问其比较寄存器。
    */
-  static const uint8_t error_message[] = "ERR\r\n";
-  if (huart2.Instance == USART2)
+  if (htim17.Instance == TIM17)
   {
-    (void)HAL_UART_Transmit(&huart2, (uint8_t *)error_message,
-                            (uint16_t)(sizeof(error_message) - 1U), 100U);
+    __HAL_TIM_SET_COMPARE(&htim17, TIM_CHANNEL_1, 0U);
   }
   __disable_irq();
   while (1)

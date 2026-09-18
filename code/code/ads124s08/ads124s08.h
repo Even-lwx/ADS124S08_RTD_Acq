@@ -78,8 +78,6 @@ typedef struct
   GPIO_TypeDef *dout_port;/**< DOUT/DRDY 所在 GPIO 端口。 */
   uint16_t dout_pin;      /**< DOUT/DRDY 的 GPIO 引脚掩码。 */
   uint32_t spi_timeout_ms;/**< 每次 HAL SPI 阻塞传输的超时时间，单位 ms。 */
-  /** 最近一次 RDATA 返回的三个原始字节，便于诊断 SPI 和模拟量。 */
-  uint8_t last_data[3];
 } ADS124S08_HandleTypeDef;
 
 /**

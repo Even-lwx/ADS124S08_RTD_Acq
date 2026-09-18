@@ -396,9 +396,6 @@ ADS124S08_Status ADS124S08_ReadSingle(ADS124S08_HandleTypeDef *device,
 
   /* ADC 按高字节在前输出 24 位二进制补码；bit23 为符号位。 */
   raw = ((uint32_t)data[0] << 16) | ((uint32_t)data[1] << 8) | data[2];
-  device->last_data[0] = data[0];
-  device->last_data[1] = data[1];
-  device->last_data[2] = data[2];
   if ((raw & 0x00800000UL) != 0UL)
   {
     raw |= 0xFF000000UL;

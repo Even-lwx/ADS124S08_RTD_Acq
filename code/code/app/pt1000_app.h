@@ -43,20 +43,6 @@ typedef struct
   PT1000_AppSnapshot snapshot; /**< 最近一次完成的四通道数据。 */
   uint32_t next_sample_tick; /**< 下一轮采样的绝对毫秒时刻。 */
   uint8_t adc_ready; /**< 1=ADC 已初始化，0=下轮需尝试重新初始化。 */
-  ADS124S08_Status last_init_status; /**< 最近一次 ADS124S08_Init() 返回值。 */
-  ADS124S08_Status channel_status[PT1000_APP_CHANNEL_COUNT]; /**< 本轮各通道最终状态。 */
-  /** 各通道转换结束后立即读取的 ADS124S08 STATUS，0xFF 表示读取失败。 */
-  uint8_t channel_adc_status[PT1000_APP_CHANNEL_COUNT];
-  /** IDAC1 直通 AIN1/REFP0 回流路径自检后的 STATUS，0xFF 表示自检失败。 */
-  uint8_t reference_test_status;
-  /** 使用内部 2.5 V 参考测量 AVDD/4 的驱动状态。 */
-  ADS124S08_Status analog_supply_test_status;
-  /** AVDD/4 系统监测的原始码；3.3 V AVDD 时应约为 2768241。 */
-  int32_t analog_supply_test_code;
-  /** 使用内部参考测量 CH1 与 IDAC1 的驱动状态。 */
-  ADS124S08_Status idac_test_status;
-  /** CH1 内部参考自检原始码；跨接 1 kΩ 时应约为 838861。 */
-  int32_t idac_test_code;
 } PT1000_App;
 
 /**
