@@ -96,6 +96,28 @@ void TemperatureControl_Task(TemperatureControl *control);
  */
 void TemperatureControl_Stop(TemperatureControl *control);
 
+/**
+ * @brief 在运行时更新目标温度，并从安全的 0% 输出重新建立参考轨迹。
+ * @param control 已初始化的温控实例。
+ * @param setpoint_c 新目标温度，必须大于等于 0 ℃并严格低于过温阈值。
+ * @return 参数有效返回 HAL_OK，否则保持原目标并返回 HAL_ERROR。
+ * @note 参数只保存在 RAM；过温锁定状态不会被本接口清除。
+ */
+HAL_StatusTypeDef TemperatureControl_SetSetpoint(
+    TemperatureControl *control,
+    float setpoint_c);
+
+/**
+ * @brief 在运行时允许或禁止加热控制。
+ * @param control 已初始化的温控实例。
+ * @param enabled 0 表示立即停热；1 表示在下一轮有效采样后恢复控制。
+ * @return 参数有效返回 HAL_OK，否则返回 HAL_ERROR。
+ * @note 重新使能不会清除过温锁定，过温后仍必须重新上电。
+ */
+HAL_StatusTypeDef TemperatureControl_SetEnabled(
+    TemperatureControl *control,
+    uint8_t enabled);
+
 #ifdef __cplusplus
 }
 #endif

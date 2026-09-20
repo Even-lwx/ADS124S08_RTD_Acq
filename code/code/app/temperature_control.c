@@ -469,6 +469,42 @@ void TemperatureControl_Stop(TemperatureControl *control)
   control->dt_seconds = 0.0f;
 }
 
+HAL_StatusTypeDef TemperatureControl_SetSetpoint(
+    TemperatureControl *control,
+    float setpoint_c)
+{
+  if ((control == NULL) || (setpoint_c < 0.0f) ||
+      (setpoint_c >= control->config.overtemperature_c))
+  {
+    return HAL_ERROR;
+  }
+
+  /*
+   * 先关闭输出并清除历史状态，防止旧目标的积分或微分在目标跳变时
+   * 继续作用。下一轮有效采样会从当前实测温度重建平滑参考轨迹。
+   */
+  TemperatureControl_Stop(control);
+  control->config.setpoint_c = setpoint_c;
+  control->last_update_tick = 0U;
+  return HAL_OK;
+}
+
+HAL_StatusTypeDef TemperatureControl_SetEnabled(
+    TemperatureControl *control,
+    uint8_t enabled)
+{
+  if ((control == NULL) || (enabled > 1U))
+  {
+    return HAL_ERROR;
+  }
+
+  /* 禁用和重新使能都从 0% 输出开始，避免恢复时沿用停机前的积分。 */
+  TemperatureControl_Stop(control);
+  control->config.enabled = enabled;
+  control->last_update_tick = 0U;
+  return HAL_OK;
+}
+
 void TemperatureControl_Task(TemperatureControl *control)
 {
   PT1000_AppSnapshot snapshot;
@@ -567,7 +603,13 @@ void TemperatureControl_Task(TemperatureControl *control)
   {
     /* 安全停止或时间异常恢复后，从电压前馈初值重新开始，不继承旧学习状态。 */
     PID_Reset(&control->pid);
-    control->pid.integral = control->config.pid.integral_initial;
+    /*
+     * 只有反馈低于最终目标时才装载维持功率前馈。目标被调低或设备
+     * 已经偏热时积分从 0 开始，确保仅加热执行器不会继续加热。
+     */
+    control->pid.integral =
+        (feedback_c < control->config.setpoint_c) ?
+        control->config.pid.integral_initial : 0.0f;
     control->reference_c = feedback_c;
     control->previous_feedback_c = feedback_c;
     control->temperature_rate_c_per_s = 0.0f;

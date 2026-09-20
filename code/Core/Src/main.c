@@ -32,6 +32,7 @@
 #include "temperature_control_profile.h"
 #include "pwm_duty_test.h"
 #include "board_io.h"
+#include "temperature_modbus.h"
 
 /* USER CODE END Includes */
 
@@ -79,6 +80,8 @@ typedef enum
 #define TEMPERATURE_OVERTEMPERATURE_C 45.0f
 /** 非 0 时每轮输出一行纯数字 FireWater 温控数据，当前采集频率为 5 Hz。 */
 #define TEMPERATURE_PID_TELEMETRY_ENABLE 1U
+/** USART1/RS485 上固定使用的 Modbus RTU 从机地址。 */
+#define TEMPERATURE_MODBUS_SLAVE_ADDRESS 1U
 
 /* USER CODE END PD */
 
@@ -96,6 +99,7 @@ static PT1000_AppConfig pt1000_config;
 static PWM_DutyTest pwm_duty_test;
 static TemperatureControl temperature_control;
 static TemperatureControl_Config temperature_control_config;
+static TemperatureModbus_HandleTypeDef temperature_modbus;
 
 /* USER CODE END PV */
 
@@ -197,6 +201,18 @@ int main(void)
       /* PWM/PID 初始化失败时保持 PD1/EN 为安全的非加热状态。 */
       __HAL_TIM_SET_COMPARE(&htim17, TIM_CHANNEL_1, 0U);
     }
+    else
+    {
+      /*
+       * USART1 固定为 9600 8N1，PC6 高发送、低接收。初始化失败不会
+       * 影响本地采集和温控，只会令 485 业务保持不可用。
+       */
+      (void)TemperatureModbus_Init(&temperature_modbus, &huart1,
+                                   RS485_DE_RE_GPIO_Port,
+                                   RS485_DE_RE_Pin,
+                                   TEMPERATURE_MODBUS_SLAVE_ADDRESS,
+                                   &pt1000_app, &temperature_control);
+    }
   }
   /* 定时器输出启动后再把 PD1 切为复用功能，避免 EN 出现启动毛刺。 */
   MX_TIM17_PWM_GPIO_Init();
@@ -211,6 +227,8 @@ int main(void)
   while (1)
   {
     BoardButton_Update();
+    /* 在进入阻塞式 ADC 采样前先处理已经收完的 Modbus RTU 请求。 */
+    TemperatureModbus_Process(&temperature_modbus, HAL_GetTick());
     PT1000_AppTask(&pt1000_app);
     if (PWM_RUN_MODE == PWM_RUN_MODE_TEST)
     {
@@ -220,6 +238,9 @@ int main(void)
     {
       TemperatureControl_Task(&temperature_control);
     }
+
+    /* ADC 采样期间收到的帧在这里尽快应答，最坏延迟约为一轮采样时间。 */
+    TemperatureModbus_Process(&temperature_modbus, HAL_GetTick());
 
     /* 直接读取 TIM17 实际比较值，兼容 PID 工作模式和 PWM 阶梯测试模式。 */
     BoardHeatingIndicator_Update(
@@ -284,6 +305,24 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+/** @brief USART1 最后一个停止位发送完成后恢复 RS485 接收方向。 */
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+  TemperatureModbus_OnUartTxCompleteISR(&temperature_modbus, huart);
+}
+
+/** @brief 把 USART1 收到的单个字节交给 RS485 帧缓冲区。 */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  TemperatureModbus_OnUartRxCompleteISR(&temperature_modbus, huart);
+}
+
+/** @brief 发生溢出、帧错误或噪声错误时丢弃当前帧并恢复接收。 */
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+  TemperatureModbus_OnUartErrorISR(&temperature_modbus, huart);
+}
 
 /* USER CODE END 4 */
 

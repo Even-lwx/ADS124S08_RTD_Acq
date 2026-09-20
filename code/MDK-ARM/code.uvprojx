@@ -339,7 +339,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32G031xx</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../code/ads124s08;../code/pt1000;../code/pid;../code/app;../code/board_io;../Drivers/STM32G0xx_HAL_Driver/Inc;../Drivers/STM32G0xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32G0xx/Include;../Drivers/CMSIS/Include</IncludePath>
+              <IncludePath>../Core/Inc;../code/ads124s08;../code/pt1000;../code/pid;../code/app;../code/board_io;../code/rs485;../code/modbus_rtu;../Drivers/STM32G0xx_HAL_Driver/Inc;../Drivers/STM32G0xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32G0xx/Include;../Drivers/CMSIS/Include</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -477,6 +477,21 @@
               <FileName>board_io.c</FileName>
               <FileType>1</FileType>
               <FilePath>../code/board_io/board_io.c</FilePath>
+            </File>
+            <File>
+              <FileName>rs485.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../code/rs485/rs485.c</FilePath>
+            </File>
+            <File>
+              <FileName>modbus_rtu_slave.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../code/modbus_rtu/modbus_rtu_slave.c</FilePath>
+            </File>
+            <File>
+              <FileName>temperature_modbus.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../code/app/temperature_modbus.c</FilePath>
             </File>
           </Files>
         </Group>
