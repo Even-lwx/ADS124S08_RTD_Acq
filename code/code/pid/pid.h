@@ -17,6 +17,7 @@ typedef struct
   float kp; /**< 比例系数，直接乘以当前误差。 */
   float ki; /**< 积分系数，按 ki*error*dt 累加。 */
   float kd; /**< 微分系数，乘以误差变化率。 */
+  float derivative_filter_time_constant_s; /**< 微分一阶低通时间常数，0 表示不滤波。 */
   float output_min; /**< 控制器总输出下限；加热应用必须不小于 0。 */
   float output_max; /**< 控制器总输出上限；占空比应用必须不大于 100。 */
   float integral_min; /**< 积分项下限，用于抑制积分饱和。 */
@@ -33,6 +34,7 @@ typedef struct
   float derivative; /**< 最近一次计算的微分项 Kd*d(error)/dt。 */
   float output; /**< 最近一次经过限幅的 PID 总输出。 */
   float previous_error; /**< 上一次误差，用于计算离散微分。 */
+  float filtered_derivative; /**< 低通滤波后的误差变化率。 */
   uint8_t initialized; /**< 0=尚无历史误差，首次更新不计算微分。 */
 } PID_Controller;
 
@@ -57,6 +59,20 @@ void PID_Reset(PID_Controller *controller);
  * @return 经输出限幅后的控制量；参数非法时返回 0。
  */
 float PID_Update(PID_Controller *controller, float error, float dt_seconds);
+
+/**
+ * @brief 按位置式 PID 计算输出，并允许上层临时冻结积分学习。
+ * @param controller 已初始化的控制器实例。
+ * @param error 当前误差。
+ * @param dt_seconds 本次更新间隔，单位 s。
+ * @param integral_enabled 非 0 时允许积分更新，0 时保持当前积分值。
+ * @return 经输出限幅后的控制量；参数非法时返回 0。
+ * @note 冻结积分不会清除已有积分，适合在大误差升温阶段保持前馈值。
+ */
+float PID_UpdateConditional(PID_Controller *controller,
+                            float error,
+                            float dt_seconds,
+                            uint8_t integral_enabled);
 
 #ifdef __cplusplus
 }

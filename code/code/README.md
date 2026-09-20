@@ -86,26 +86,27 @@ IDAC2 始终断开；SPI 使用 Mode 1、8 MHz。每路单次转换的典型首�
 `PT1000_AppGetDefaultConfig()` 后，可修改参考电阻实测值以及各通道的
 `resistance_gain`、`resistance_offset_ohm`。
 
-USART2 在工作模式下每轮输出一行固定 18 列的纯数字 FireWater 数据，
+USART2 在工作模式下每轮输出一行固定 20 列的纯数字 FireWater 数据，
 当前输出频率与四路采集和 PID 更新频率一致，均为 5 Hz：
 
 ```text
-25.01,25.03,24.99,25.02,43.00,25.03,17.97,3.000,0.025,0.000,53.91,0.00,0.00,30.00,30.00,0.20,4,1\n
+25.01,25.03,24.99,25.02,42.00,25.09,25.03,0.06,0.01,2.000,0.025,4.000,0.12,8.36,0.04,8.52,24.00,0.20,4,1\n
 ```
 
 列顺序固定为：
 
 ```text
-T1,T2,T3,T4,SP,FB,ERR,KP,KI,KD,P,I,D,OUT,LIM,DT,VALID,STATE
+T1,T2,T3,T4,SP,REF,FB,ERR,RATE,KP,KI,KD,P,I,D,OUT,LIM,DT,VALID,STATE
 ```
 
-`SP` 是目标温度，`FB` 是参与控制的合成反馈，`ERR=SP-FB`，
+`SP` 是最终目标温度，`REF` 是从当前反馈平滑接近目标的内部参考温度，
+`FB` 是参与控制的合成反馈，`ERR=REF-FB`，`RATE` 是低通滤波后的实际温变速率，
 `P/I/D` 是三个实际输出分量，`OUT` 是限幅后的高有效 PWM 占空比，
 `LIM` 是当前允许的占空比上限，`DT` 是本次计算间隔，`VALID` 是有效传感器数。
 `KP/KI/KD` 固定显示三位小数，其余浮点列显示两位小数，因此 `Ki=0.025`
 会原样输出，不再四舍五入显示为 `0.03`。
 `STATE=1` 表示正在控制，`STATE=0` 表示传感器不足或控制被禁用，
-`STATE=2` 表示任一有效通道达到 48 ℃ 后已锁定停机。状态 0 和 2 均强制
+`STATE=2` 表示任一有效通道达到 45 ℃ 后已锁定停机。状态 0 和 2 均强制
 加热输出归零；过温锁定只能通过重新上电清除。失效温度列用 `0.00` 占位，
 需结合 `VALID/STATE` 判断。ADC 原始码仍保存在内部快照中，但不输出到
 FireWater，避免百万级码值把温度和 PID 曲线压缩在图表底部。
@@ -120,29 +121,28 @@ TIM17 使用 64 MHz 时钟、PSC=63、ARR=999，在 PD1/EN 输出 1 kHz 高有�
 PID 参数入口位于 `Core/Src/main.c`：
 
 ```c
-temperature_control_config.setpoint_c = 43.0f;
-temperature_control_config.pid.kp = 3.0f;
+temperature_control_config.setpoint_c = 42.0f;
+temperature_control_config.pid.kp = 2.0f;
 temperature_control_config.pid.ki = 0.025f;
-temperature_control_config.pid.kd = 0.0f;
-temperature_control_config.pid.output_max = 30.0f;
+temperature_control_config.pid.kd = 4.0f;
+temperature_control_config.pid.derivative_filter_time_constant_s = 1.0f;
+temperature_control_config.reference_time_constant_s = 12.0f;
+temperature_control_config.reference_max_rate_c_per_s = 0.30f;
 temperature_control_config.pid.integral_max = 12.0f;
-temperature_control_config.pid.integral_initial = 6.0f;
 temperature_control_config.feedback_mode = TEMPERATURE_FEEDBACK_MAXIMUM;
-temperature_control_config.overtemperature_c = 48.0f;
+temperature_control_config.overtemperature_c = 45.0f;
 ```
 
-第一轮纯 P 数据显示最高温反馈稳定在约 40.63 ℃，稳态误差约 2.37 ℃，
-维持输出约 7.12%。第二轮保持 `Kp=3.0 %/℃`，加入较缓慢的
-`Ki=0.025 %/(℃·s)` 消除该稳态误差，`Kd` 暂时保持 0。积分项独立限制为
-0～12%，并使用条件积分抗饱和：总输出到达上下限且误差会继续加重饱和时
-暂停积分，误差反向时仍允许释放积分。根据 12 V、680 Ω 限流实测，系统维持
-43 ℃ 约需 7.4% PWM，因此初始化时把积分项预置为 6%。这样首次接近目标时
-输出不会因积分尚未建立而过早降到约 5%，可减轻 42～43 ℃ 区间的温度回落。
-该预置值只在控制器初始化时装载；传感器故障、控制禁用或过温停机仍会清零积分。
-当前 30% 限幅只限制占空比；TPS27S100 导通时的输出高电平仍接近 VIN。
+控制器使用两自由度结构。内部参考 `REF` 从首次有效反馈开始，以 12 s 一阶时间常数
+和最大 0.30 ℃/s 速度接近 42 ℃，因此初始温差不会直接产生很大的比例输出。
+`Kp=2.0`、`Kd=4.0` 对参考跟踪误差和变化率进行修正，D 项使用 1 s 一阶低通，
+避免 ADC 噪声被放大。积分项以电压曲线给出的维持功率作为前馈初值；只有最终
+目标误差不超过 2 ℃且实际温变速率不超过 0.10 ℃/s 时，`Ki=0.025` 才在线
+学习当前散热环境所需的维持功率。积分仍带 0～12% 限幅和条件抗饱和。
+安全限幅只限制占空比；TPS27S100 导通时的输出高电平仍接近 VIN。
 本板未把 VIN 接入 MCU ADC，因此固件无法在 12～24 V 变化时自动换算功率限幅。
 
-控制误差固定为“设定温度 - 反馈温度”，当前输出限制在 0～30%，所以框架只会
+控制误差为“内部参考温度 - 反馈温度”，最终目标始终保持 42 ℃。输出下限为 0%，所以框架只会
 加热，不会产生制冷方向。PD1/EN 的 PWM 为高电平有效。反馈可选
 平均值、最大值、最小值或指定通道，见 `TemperatureControl_FeedbackMode`。
 
@@ -153,6 +153,24 @@ temperature_control_config.overtemperature_c = 48.0f;
 可将该宏改为 `PWM_RUN_MODE_TEST`；固件将绕过 PID，让 PD1/EN 按
 10 秒间隔循环输出 20%、40%、60%、80% 和 90% 高电平占空比。PWM 硬件
 测试模式不执行 PID，因此不输出上述 FireWater 温控帧。
+
+### 输入电压补偿
+
+`Core/Src/main.c` 中的 `TEMPERATURE_INPUT_VOLTAGE_V` 是实际接入 VIN 的电压宏，
+当前默认值为 `12.0f`。初始化温控器时，`temperature_control_profile.c` 会依据实测
+日志只对维持功率前馈初值和安全输出上限进行分段线性插值：
+
+| VIN | 9 V | 12 V | 15 V | 18 V | 24 V |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 积分初值前馈（%） | 10.78 | 8.36 | 7.43 | 7.27 | 7.10 |
+| PWM 输出上限（%） | 30.0 | 24.0 | 24.0 | 24.0 | 18.0 |
+
+9~18 V 的锚点来自 680 ohm 限流电阻下四份实测数据尾段的 `I` 积分项平均值，24 V 为设计上限
+处的保守外推值。Kp、Ki、Kd、参考轨迹和速率滤波不按电压或绝对温度查表，
+避免把某次环境下的升温曲线固化进控制器。电压表中的积分初值只是上电先验值，
+实际维持功率由闭环在目标附近在线学习。学习值保存在 RAM，重新上电后从电压表
+初值重新开始，避免频繁写 Flash。
+改变电压时只需修改该宏并重新编译；函数会把超出 9~24 V 的值限制到最近端点。
 
 ## 硬件限制
 

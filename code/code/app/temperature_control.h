@@ -30,6 +30,11 @@ typedef struct
 {
   float setpoint_c; /**< 目标温度，单位 ℃。 */
   PID_Config pid;   /**< PID 系数、输出限幅和积分限幅。 */
+  float reference_time_constant_s; /**< 内部参考轨迹接近目标的时间常数。 */
+  float reference_max_rate_c_per_s; /**< 内部参考轨迹最大变化速率。 */
+  float feedforward_learning_error_c; /**< 允许积分学习的目标附近误差范围。 */
+  float feedforward_learning_rate_c_per_s; /**< 允许积分学习的最大温变速率。 */
+  float rate_filter_time_constant_s; /**< 实际温变速率的一阶低通时间常数。 */
   TemperatureControl_FeedbackMode feedback_mode; /**< 四路反馈合成策略。 */
   float overtemperature_c; /**< 任一有效通道触发锁定停机的温度。 */
   uint8_t enabled;  /**< 非 0 允许加热，0 强制输出 0% 并清积分。 */
@@ -47,10 +52,14 @@ typedef struct
   uint32_t last_sequence; /**< 已处理的采样轮次，防止重复计算。 */
   uint32_t last_update_tick; /**< 上次控制更新时间戳，用于计算 dt。 */
   float feedback_c; /**< 最近一次有效的合成反馈温度，单位 ℃。 */
-  float error_c; /**< 最近一次设定温度与反馈温度之差，单位 ℃。 */
+  float reference_c; /**< 平滑后的内部控制参考温度，单位 ℃。 */
+  float error_c; /**< 内部参考温度与反馈温度之差，单位 ℃。 */
+  float previous_feedback_c; /**< 上一次反馈温度，用于计算温变速率。 */
+  float temperature_rate_c_per_s; /**< 低通滤波后的实际温变速率。 */
   float dt_seconds; /**< 最近一次 PID 更新的实际时间间隔。 */
   float duty_percent; /**< 当前高有效占空比，范围 0～pid.output_max。 */
   uint8_t overtemperature_latched; /**< 1=已触发过温锁定，只能重新上电清除。 */
+  uint8_t reference_initialized; /**< 1=内部参考轨迹和速率状态已初始化。 */
 } TemperatureControl;
 
 /**

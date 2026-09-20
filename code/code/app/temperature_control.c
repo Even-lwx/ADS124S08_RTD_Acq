@@ -17,6 +17,28 @@
 /** 首次尚无历史时间戳时采用的标称 5 Hz 控制周期。 */
 #define TEMPERATURE_CONTROL_INITIAL_DT_SECONDS 0.2f
 
+/** @brief 返回浮点数绝对值，避免为单一运算引入数学库。 */
+static float TemperatureControl_Abs(float value)
+{
+  return (value >= 0.0f) ? value : -value;
+}
+
+/** @brief 将数值限制到闭区间。 */
+static float TemperatureControl_Clamp(float value,
+                                      float minimum,
+                                      float maximum)
+{
+  if (value < minimum)
+  {
+    return minimum;
+  }
+  if (value > maximum)
+  {
+    return maximum;
+  }
+  return value;
+}
+
 /**
  * @brief 把无符号整数以十进制追加到 FireWater 帧。
  * @note 手工格式化可避免引入 printf 浮点支持。
@@ -103,8 +125,9 @@ static char *TemperatureControl_AppendFloat3(char *destination, float value)
  * @param snapshot 与本次 PID 计算对应的四路温度快照。
  * @param feedback_valid 非 0 表示本轮反馈满足控制条件。
  * @param valid_count 本轮有效温度传感器数量。
- * @note 固定列顺序为 T1,T2,T3,T4,SP,FB,ERR,KP,KI,KD,P,I,D,OUT,
- *       LIM,DT,VALID,STATE，仅以 '\n' 结尾。STATE=2 表示过温锁定。
+ * @note 固定列顺序为 T1,T2,T3,T4,SP,REF,FB,ERR,RATE,KP,KI,KD,
+ *       P,I,D,OUT,LIM,DT,VALID,STATE，仅以 '\n' 结尾。
+ *       REF 是内部平滑参考，RATE 是滤波后的实际温变速率。
  */
 static void TemperatureControl_SendTelemetry(
     TemperatureControl *control,
@@ -140,6 +163,15 @@ static void TemperatureControl_SendTelemetry(
   *cursor++ = ',';
   if (feedback_valid != 0U)
   {
+    cursor = TemperatureControl_AppendFloat2(cursor, control->reference_c);
+  }
+  else
+  {
+    cursor = TemperatureControl_AppendFloat2(cursor, 0.0f);
+  }
+  *cursor++ = ',';
+  if (feedback_valid != 0U)
+  {
     cursor = TemperatureControl_AppendFloat2(cursor, control->feedback_c);
   }
   else
@@ -150,6 +182,16 @@ static void TemperatureControl_SendTelemetry(
   if (feedback_valid != 0U)
   {
     cursor = TemperatureControl_AppendFloat2(cursor, control->error_c);
+  }
+  else
+  {
+    cursor = TemperatureControl_AppendFloat2(cursor, 0.0f);
+  }
+  *cursor++ = ',';
+  if (feedback_valid != 0U)
+  {
+    cursor = TemperatureControl_AppendFloat2(
+        cursor, control->temperature_rate_c_per_s);
   }
   else
   {
@@ -348,13 +390,19 @@ void TemperatureControl_GetDefaultConfig(TemperatureControl_Config *config)
   config->pid.kp = 0.0f;
   config->pid.ki = 0.0f;
   config->pid.kd = 0.0f;
+  config->pid.derivative_filter_time_constant_s = 1.0f;
   config->pid.output_min = 0.0f;
   config->pid.output_max = 100.0f;
   config->pid.integral_min = 0.0f;
   config->pid.integral_max = 100.0f;
   config->pid.integral_initial = 0.0f;
+  config->reference_time_constant_s = 12.0f;
+  config->reference_max_rate_c_per_s = 0.30f;
+  config->feedforward_learning_error_c = 2.0f;
+  config->feedforward_learning_rate_c_per_s = 0.10f;
+  config->rate_filter_time_constant_s = 1.0f;
   config->feedback_mode = TEMPERATURE_FEEDBACK_AVERAGE;
-  config->overtemperature_c = 48.0f;
+  config->overtemperature_c = 45.0f;
   config->enabled = 1U;
   config->telemetry_enabled = 0U;
 }
@@ -378,6 +426,12 @@ HAL_StatusTypeDef TemperatureControl_Init(
       (config->pid.integral_min > config->pid.integral_max) ||
       (config->pid.integral_initial < config->pid.integral_min) ||
       (config->pid.integral_initial > config->pid.integral_max) ||
+      (config->pid.derivative_filter_time_constant_s < 0.0f) ||
+      (config->reference_time_constant_s <= 0.0f) ||
+      (config->reference_max_rate_c_per_s <= 0.0f) ||
+      (config->feedforward_learning_error_c < 0.0f) ||
+      (config->feedforward_learning_rate_c_per_s < 0.0f) ||
+      (config->rate_filter_time_constant_s <= 0.0f) ||
       (config->overtemperature_c <= config->setpoint_c) ||
       (config->feedback_mode > TEMPERATURE_FEEDBACK_CHANNEL_4))
   {
@@ -409,6 +463,9 @@ void TemperatureControl_Stop(TemperatureControl *control)
   TemperatureControl_SetDuty(control, 0.0f);
   PID_Reset(&control->pid);
   control->error_c = 0.0f;
+  control->reference_c = 0.0f;
+  control->temperature_rate_c_per_s = 0.0f;
+  control->reference_initialized = 0U;
   control->dt_seconds = 0.0f;
 }
 
@@ -417,6 +474,11 @@ void TemperatureControl_Task(TemperatureControl *control)
   PT1000_AppSnapshot snapshot;
   float feedback_c;
   float dt_seconds;
+  float target_error_c;
+  float reference_rate_c_per_s;
+  float raw_temperature_rate_c_per_s;
+  float rate_filter_alpha;
+  uint8_t integral_enabled;
   uint8_t valid_count = 0U;
   uint8_t feedback_valid;
 
@@ -490,13 +552,73 @@ void TemperatureControl_Task(TemperatureControl *control)
     {
       dt_seconds = TEMPERATURE_CONTROL_INITIAL_DT_SECONDS;
       PID_Reset(&control->pid);
+      control->reference_initialized = 0U;
     }
   }
   control->last_update_tick = snapshot.tick_ms;
   control->dt_seconds = dt_seconds;
 
+  /*
+   * 首次获得有效温度时让内部参考从当前反馈起步，避免目标温度阶跃直接产生
+   * 巨大 P 输出。随后参考按一阶轨迹接近最终设定值，并限制最大升温速度；
+   * 该轨迹只依赖当前状态，不依赖某个绝对温度对应的固定占空比。
+   */
+  if (control->reference_initialized == 0U)
+  {
+    /* 安全停止或时间异常恢复后，从电压前馈初值重新开始，不继承旧学习状态。 */
+    PID_Reset(&control->pid);
+    control->pid.integral = control->config.pid.integral_initial;
+    control->reference_c = feedback_c;
+    control->previous_feedback_c = feedback_c;
+    control->temperature_rate_c_per_s = 0.0f;
+    control->reference_initialized = 1U;
+  }
+  else
+  {
+    raw_temperature_rate_c_per_s =
+        (feedback_c - control->previous_feedback_c) / dt_seconds;
+    rate_filter_alpha = dt_seconds /
+        (control->config.rate_filter_time_constant_s + dt_seconds);
+    control->temperature_rate_c_per_s += rate_filter_alpha *
+        (raw_temperature_rate_c_per_s -
+         control->temperature_rate_c_per_s);
+    control->previous_feedback_c = feedback_c;
+  }
+
+  reference_rate_c_per_s =
+      (control->config.setpoint_c - control->reference_c) /
+      control->config.reference_time_constant_s;
+  reference_rate_c_per_s = TemperatureControl_Clamp(
+      reference_rate_c_per_s,
+      -control->config.reference_max_rate_c_per_s,
+      control->config.reference_max_rate_c_per_s);
+  control->reference_c += reference_rate_c_per_s * dt_seconds;
+
+  /* 防止离散步进越过最终目标。 */
+  if (((reference_rate_c_per_s >= 0.0f) &&
+       (control->reference_c > control->config.setpoint_c)) ||
+      ((reference_rate_c_per_s < 0.0f) &&
+       (control->reference_c < control->config.setpoint_c)))
+  {
+    control->reference_c = control->config.setpoint_c;
+  }
+
+  control->error_c = control->reference_c - feedback_c;
+  target_error_c = control->config.setpoint_c - feedback_c;
+
+  /*
+   * 积分项以电压曲线给出的维持功率为初始前馈。只有已经接近最终目标且
+   * 温度变化足够慢时才允许在线学习散热变化，避免把升温惯性误学成维持功率。
+   */
+  integral_enabled =
+      ((TemperatureControl_Abs(target_error_c) <=
+        control->config.feedforward_learning_error_c) &&
+       (TemperatureControl_Abs(control->temperature_rate_c_per_s) <=
+        control->config.feedforward_learning_rate_c_per_s)) ? 1U : 0U;
+
   /* 仅加热极性：低于设定温度时误差为正，负输出固定截止为 0%。 */
   TemperatureControl_SetDuty(control,
-      PID_Update(&control->pid, control->error_c, dt_seconds));
+      PID_UpdateConditional(&control->pid, control->error_c, dt_seconds,
+                            integral_enabled));
   TemperatureControl_SendTelemetry(control, &snapshot, 1U, valid_count);
 }

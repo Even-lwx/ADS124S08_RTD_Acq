@@ -49,12 +49,17 @@ void PID_Reset(PID_Controller *controller)
   controller->derivative = 0.0f;
   controller->output = 0.0f;
   controller->previous_error = 0.0f;
+  controller->filtered_derivative = 0.0f;
   controller->initialized = 0U;
 }
 
-float PID_Update(PID_Controller *controller, float error, float dt_seconds)
+float PID_UpdateConditional(PID_Controller *controller,
+                            float error,
+                            float dt_seconds,
+                            uint8_t integral_enabled)
 {
   float derivative = 0.0f;
+  float filter_alpha;
   float candidate_integral;
   float candidate_output;
   float output;
@@ -68,10 +73,25 @@ float PID_Update(PID_Controller *controller, float error, float dt_seconds)
   if (controller->initialized != 0U)
   {
     derivative = (error - controller->previous_error) / dt_seconds;
+    if (controller->config.derivative_filter_time_constant_s > 0.0f)
+    {
+      /* 一阶低通抑制 ADC 量化噪声被 D 项放大。 */
+      filter_alpha = dt_seconds /
+          (controller->config.derivative_filter_time_constant_s +
+           dt_seconds);
+      controller->filtered_derivative +=
+          filter_alpha * (derivative - controller->filtered_derivative);
+      derivative = controller->filtered_derivative;
+    }
+    else
+    {
+      controller->filtered_derivative = derivative;
+    }
   }
   else
   {
     controller->initialized = 1U;
+    controller->filtered_derivative = 0.0f;
   }
 
   /* 先计算 P、D，积分候选值在确认不会加重输出饱和后再写回。 */
@@ -89,7 +109,8 @@ float PID_Update(PID_Controller *controller, float error, float dt_seconds)
    * 输出已低于下限且误差仍为负时同理。反向误差仍允许积分回退，
    * 因而温度接近或越过设定点后可以及时降低持续加热功率。
    */
-  if (!(((candidate_output > controller->config.output_max) &&
+  if ((integral_enabled != 0U) &&
+      !(((candidate_output > controller->config.output_max) &&
          (error > 0.0f)) ||
         ((candidate_output < controller->config.output_min) &&
          (error < 0.0f))))
@@ -105,4 +126,10 @@ float PID_Update(PID_Controller *controller, float error, float dt_seconds)
   controller->output = output;
   controller->previous_error = error;
   return output;
+}
+
+float PID_Update(PID_Controller *controller, float error, float dt_seconds)
+{
+  /* 通用接口默认始终允许积分，保持原有调用行为不变。 */
+  return PID_UpdateConditional(controller, error, dt_seconds, 1U);
 }

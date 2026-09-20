@@ -29,6 +29,7 @@
 
 #include "pt1000_app.h"
 #include "temperature_control.h"
+#include "temperature_control_profile.h"
 #include "pwm_duty_test.h"
 #include "board_io.h"
 
@@ -54,21 +55,28 @@ typedef enum
 
 /*
  * 第二轮整定加入小积分项。Kp 的单位为“占空比百分点/℃”：
- * 例如误差为 10 ℃、Kp=3 时，未限幅的 P 输出为 30%。
+ * 例如跟踪误差为 1 ℃、Kp=2 时，P 输出为 2%。
  * Ki 的单位为“占空比百分点/(℃·s)”，用于缓慢消除纯 P 稳态误差。
  */
 #define TEMPERATURE_SETPOINT_C 42.0f
-#define TEMPERATURE_PID_KP      3.0f
+#define TEMPERATURE_INPUT_VOLTAGE_V 14.0f
+#define TEMPERATURE_PID_KP      2.0f
 #define TEMPERATURE_PID_KI      0.025f
-#define TEMPERATURE_PID_KD      0.0f
+#define TEMPERATURE_PID_KD      4.0f
+/** 内部参考轨迹的一阶时间常数；越大则接近目标时减速越早。 */
+#define TEMPERATURE_REFERENCE_TIME_CONSTANT_S 12.0f
+/** 内部参考轨迹允许的最大升温/降温速度。 */
+#define TEMPERATURE_REFERENCE_MAX_RATE_C_PER_S 0.30f
+/** D 项低通滤波时间常数，用于抑制 ADC 噪声放大。 */
+#define TEMPERATURE_D_FILTER_TIME_CONSTANT_S 1.0f
 /** 工作模式下允许输出的最大高有效 PWM 占空比。 */
 #define TEMPERATURE_PWM_MAX_DUTY_PERCENT 30.0f
 /** 积分项单独限幅，避免积分独自给出过大的持续加热功率。 */
 #define TEMPERATURE_PID_INTEGRAL_MAX_PERCENT 12.0f
-/** 12 V 实测维持功率约 7.4%，预置 6% 可减轻接近目标时的温度回落。 */
+/** 默认值；实际值由 TEMPERATURE_INPUT_VOLTAGE_V 的电压曲线函数覆盖。 */
 #define TEMPERATURE_PID_INTEGRAL_INITIAL_PERCENT 5.5f
 /** 任一有效通道到达此温度时锁定关闭加热，直到重新上电。 */
-#define TEMPERATURE_OVERTEMPERATURE_C 48.0f
+#define TEMPERATURE_OVERTEMPERATURE_C 45.0f
 /** 非 0 时每轮输出一行纯数字 FireWater 温控数据，当前采集频率为 5 Hz。 */
 #define TEMPERATURE_PID_TELEMETRY_ENABLE 1U
 
@@ -161,12 +169,21 @@ int main(void)
     temperature_control_config.pid.kp = TEMPERATURE_PID_KP;
     temperature_control_config.pid.ki = TEMPERATURE_PID_KI;
     temperature_control_config.pid.kd = TEMPERATURE_PID_KD;
+    temperature_control_config.pid.derivative_filter_time_constant_s =
+        TEMPERATURE_D_FILTER_TIME_CONSTANT_S;
     temperature_control_config.pid.output_max =
         TEMPERATURE_PWM_MAX_DUTY_PERCENT;
     temperature_control_config.pid.integral_max =
         TEMPERATURE_PID_INTEGRAL_MAX_PERCENT;
     temperature_control_config.pid.integral_initial =
         TEMPERATURE_PID_INTEGRAL_INITIAL_PERCENT;
+    /* 根据实际 VIN 只选择维持功率前馈初值和硬件安全输出上限。 */
+    TemperatureControl_ApplyVoltageProfile(&temperature_control_config,
+                                           TEMPERATURE_INPUT_VOLTAGE_V);
+    temperature_control_config.reference_time_constant_s =
+        TEMPERATURE_REFERENCE_TIME_CONSTANT_S;
+    temperature_control_config.reference_max_rate_c_per_s =
+        TEMPERATURE_REFERENCE_MAX_RATE_C_PER_S;
     temperature_control_config.feedback_mode =
         TEMPERATURE_FEEDBACK_MAXIMUM;
     temperature_control_config.overtemperature_c =
