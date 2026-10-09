@@ -2,7 +2,7 @@
  * @file temperature_control.c
  * @brief 四路反馈选择、仅加热 PID 与高有效 PWM 输出实现。
  *
- * 安全策略：有效温度少于两路、控制禁用或采样时间异常时，
+ * 安全策略：没有有效温度、控制禁用或采样时间异常时，
  * PWM 归零并清积分。
  */
 #include "temperature_control.h"
@@ -13,7 +13,7 @@
 /** PID 整定帧使用阻塞发送时的最大等待时间。 */
 #define TEMPERATURE_CONTROL_UART_TIMEOUT_MS 100U
 /** 进入温控计算所需的最少有效传感器数量。 */
-#define TEMPERATURE_CONTROL_MIN_VALID_SENSORS 2U
+#define TEMPERATURE_CONTROL_MIN_VALID_SENSORS 1U
 /** 首次尚无历史时间戳时采用的标称 5 Hz 控制周期。 */
 #define TEMPERATURE_CONTROL_INITIAL_DT_SECONDS 0.2f
 
@@ -270,7 +270,7 @@ static void TemperatureControl_SetDuty(TemperatureControl *control,
  * @param snapshot 最新四路温度快照。
  * @param feedback_c 返回合成后的温度，单位 ℃。
  * @param valid_count 返回本轮有效传感器数量。
- * @return 至少两路有效且反馈策略可用时返回 1，否则返回 0。
+ * @return 至少一路有效且反馈策略可用时返回 1，否则返回 0。
  */
 static uint8_t TemperatureControl_GetFeedback(
     const TemperatureControl *control,
@@ -293,7 +293,7 @@ static uint8_t TemperatureControl_GetFeedback(
       (*valid_count)++;
     }
   }
-  /* 容许损失两路传感器，但少于两路时不再允许加热。 */
+  /* 只要仍有一路有效传感器即可继续控制；全部失效时安全停止。 */
   if (*valid_count < TEMPERATURE_CONTROL_MIN_VALID_SENSORS)
   {
     return 0U;

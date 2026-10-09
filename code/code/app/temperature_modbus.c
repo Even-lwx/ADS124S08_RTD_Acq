@@ -8,7 +8,7 @@
 #include <string.h>
 
 /** 允许PID控制所需的最少有效测温通道数。 */
-#define TEMPERATURE_MODBUS_MIN_VALID_CHANNELS 2U
+#define TEMPERATURE_MODBUS_MIN_VALID_CHANNELS 1U
 
 /** @brief 将浮点量四舍五入为放大100倍的有符号寄存器值。 */
 static uint16_t TemperatureModbus_EncodeHundredths(float value)

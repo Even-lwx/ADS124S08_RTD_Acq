@@ -87,7 +87,7 @@ HAL_StatusTypeDef TemperatureControl_Init(
 /**
  * @brief 在出现一轮新温度时更新反馈、PID 和 PWM 占空比。
  * @param control 已初始化的温控实例。
- * @note 无新快照时立即返回；有效传感器少于两路时执行安全停止。
+ * @note 无新快照时立即返回；没有有效传感器时执行安全停止。
  */
 void TemperatureControl_Task(TemperatureControl *control);
 /**
