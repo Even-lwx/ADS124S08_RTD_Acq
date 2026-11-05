@@ -24,6 +24,10 @@
 __pycache__/
 *.py[cod]
 /sch*.txt
+**/log/
+analysis_output*/
+output/
+tmp/
 
 # PCB: keep release archives only; exclude source trees and Altium history backups
 /pcb/**
