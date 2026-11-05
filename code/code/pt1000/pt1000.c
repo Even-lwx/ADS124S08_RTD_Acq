@@ -116,7 +116,7 @@ uint8_t PT1000_ResistanceToTemperature(float resistance_ohm,
       {
         return 0U;
       }
-      /* Newton-Raphson：T(n+1)=T(n)-[R(T)-Rmeas]/R'(T)。 */
+       /* 牛顿迭代：T(n+1)=T(n)-[R(T)-Rmeas]/R'(T)。 */
       temperature -= (calculated - resistance_ohm) / derivative;
     }
   }
