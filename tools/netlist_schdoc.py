@@ -73,13 +73,13 @@ def main():
             labels_by_name[name].append(loc)
             points.add(loc)
 
-    # Any pin/label/wire vertex located on a wire segment belongs to that wire.
+    # 位于导线段上的引脚、标签或导线顶点都属于该导线。
     for p in points:
         for a, b in segments:
             if on_segment(p, a, b):
                 dsu.union(p, a)
 
-    # Net labels and power ports connect equal names globally.
+    # 同名网络标签和电源端口在全局互连。
     for locs in labels_by_name.values():
         for loc in locs[1:]:
             dsu.union(locs[0], loc)

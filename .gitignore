@@ -1,4 +1,4 @@
-# Keil / MDK-ARM build outputs
+# Keil 和 MDK-ARM 编译输出
 /code/MDK-ARM/code/
 /code/MDK-ARM/*.log
 /code/MDK-ARM/*.lst
@@ -6,7 +6,7 @@
 /code/MDK-ARM/*.bak
 /code/MDK-ARM/*.tmp
 
-# Common embedded build artifacts
+# 常见嵌入式编译产物
 /code/**/*.o
 /code/**/*.obj
 /code/**/*.d
@@ -20,7 +20,7 @@
 /code/**/*.dep
 /code/**/*.build_log.htm
 
-# Python/tool runtime artifacts and generated reports
+# Python 和工具运行产物及生成的报告
 __pycache__/
 *.py[cod]
 /sch*.txt
@@ -29,7 +29,7 @@ analysis_output*/
 output/
 tmp/
 
-# PCB: keep release archives only; exclude source trees and Altium history backups
+# PCB：仅保留发布压缩包，忽略源文件目录和 Altium 历史备份
 /pcb/**
 !/pcb/**/
 !/pcb/**/*.zip
@@ -37,7 +37,7 @@ tmp/
 !/pcb/**/*.rar
 /pcb/**/History/
 
-# OS/editor noise
+# 操作系统和编辑器临时文件
 .DS_Store
 Thumbs.db
 Desktop.ini
