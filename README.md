@@ -8,6 +8,7 @@
 - `pcb/`：原理图、PCB 和本地元件库。
 - `doc/`：ADS124S08 和相关器件资料。
 - `tools/`：原理图网络解析和辅助检查工具。
+- `analysis/schematic/`：原根目录的 `sch.txt` 与 `sch_latest.txt` 原理图解析记录，仅用于复核，设计以 `pcb/` 中源文件为准。
 
 ## 固件功能
 

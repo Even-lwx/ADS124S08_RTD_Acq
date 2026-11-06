@@ -29,13 +29,14 @@ analysis_output*/
 output/
 tmp/
 
-# PCB：仅保留发布压缩包，忽略源文件目录和 Altium 历史备份
-/pcb/**
-!/pcb/**/
-!/pcb/**/*.zip
-!/pcb/**/*.7z
-!/pcb/**/*.rar
+# PCB：保留原理图、PCB、工程和元件库，忽略可生成的历史与输出
 /pcb/**/History/
+/pcb/**/__Previews/
+/pcb/**/Project Logs*/
+/pcb/**/Project Outputs*/
+
+# 原理图解析文本可以从源文件重新生成，保留在本机供复核
+/analysis/schematic/*.txt
 
 # 操作系统和编辑器临时文件
 .DS_Store
