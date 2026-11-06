@@ -38,6 +38,10 @@ tmp/
 # 原理图解析文本可以从源文件重新生成，保留在本机供复核
 /analysis/schematic/*.txt
 
+# 第三方调试工具运行时日志和本机串口设置
+/tools/qModMaster-Win64-exe-0.5.3-beta/**/*.log*
+/tools/qModMaster-Win64-exe-0.5.3-beta/**/*.ini
+
 # 操作系统和编辑器临时文件
 .DS_Store
 Thumbs.db

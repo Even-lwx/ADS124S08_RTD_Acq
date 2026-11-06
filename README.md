@@ -7,7 +7,7 @@
 - `code/`：固件、传感器驱动、温控算法和 Modbus 协议。
 - `pcb/`：原理图、PCB 和本地元件库。
 - `doc/`：ADS124S08 和相关器件资料。
-- `tools/`：原理图网络解析和辅助检查工具。
+- `tools/`：原理图解析脚本与 qModMaster 第三方 Modbus 主站调试工具，见 [qModMaster 使用说明](tools/qModMaster使用说明.md)。
 - `analysis/schematic/`：原根目录的 `sch.txt` 与 `sch_latest.txt` 原理图解析记录，仅用于复核，设计以 `pcb/` 中源文件为准。
 
 ## 固件功能
@@ -17,6 +17,8 @@
 ## 使用方法
 
 使用 STM32CubeIDE 或 Keil MDK 打开 `code/` 中的工程。上电前确认 PT1000 接线、IDAC 回路、RS485 终端和加热使能信号。首次调试应先读取温度和状态寄存器，再验证目标温度、PWM 输出和过温停机。
+
+电脑端可运行 `tools/qModMaster-Win64-exe-0.5.3-beta/qModMaster/qModMaster.exe`，作为 Modbus RTU 主站读取板卡寄存器。该目录是第三方工具发布包，包含运行所需的 DLL，并非本工程自行开发的上位机源码。
 
 ## 文档约定
 
